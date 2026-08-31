@@ -1,0 +1,404 @@
+{
+  "schema": "avacom-course-package/v1",
+
+  "_comentario": [
+    "Paquete de prueba · Matemáticas Séptimo grado (1.º de secundaria) · marco",
+    "mexicano (SEP). El elemento de competencia de cada lección es una PDA, que",
+    "es como la SEP llama a las Progresiones de Aprendizaje. Al importarlo desde",
+    "la OPS, elige el marco 'SEP México' para que el campo se rotule PDA.",
+    "",
+    "Contiene 4 secciones, 9 lecciones y 19 ítems.",
+    "Ninguno de sus materiales o actividades existe en la base todavía, así que",
+    "la importación los creará todos. Importarlo dos veces no duplica nada."
+  ],
+
+  "package": {
+    "package_id": "avacom.sep.mx.matematicas7",
+    "package_version": "1.0.0",
+    "operation": "install"
+  },
+
+  "course": {
+    "course_id": "CURSO-MAT7",
+    "version": 1
+  },
+
+  "publication": {
+    "activate_after_install": true
+  },
+
+  "version_meta": {
+    "instalada_por": "docente-demo",
+    "huella": "7b2d5f8c31e69a4712b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70718",
+    "notas": "Versión inicial: enteros, fracciones y decimales, proporcionalidad y geometría."
+  },
+
+  "resources": [
+    {
+      "id": "RES-M7-RECTANUM-V10",
+      "titulo": "Lectura · La recta numérica y los números negativos",
+      "content_type": "reading",
+      "content_ref": "avacom:mat7/enteros/lectura-recta-numerica",
+      "content_version": "1.0",
+      "content_huella": "b1c2d3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff00",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-SIGNOS-V10",
+      "titulo": "Video · La regla de los signos, explicada con deudas",
+      "content_type": "video",
+      "content_ref": "avacom:mat7/enteros/video-signos",
+      "content_version": "1.0",
+      "content_huella": "c2d3e4f5061728394a5b6c7d8e9f0011223344556677889900aabbccddeeff11",
+      "duracion_seg": 336,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-OPENTEROS-V10",
+      "titulo": "Lectura · Suma, resta y multiplicación de enteros",
+      "content_type": "reading",
+      "content_ref": "avacom:mat7/enteros/lectura-operaciones",
+      "content_version": "1.0",
+      "content_huella": "d3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff112233",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-EQUIVALENCIA-V10",
+      "titulo": "Lectura · Fracciones equivalentes y cómo compararlas",
+      "content_type": "reading",
+      "content_ref": "avacom:mat7/fracciones/lectura-equivalencia",
+      "content_version": "1.0",
+      "content_huella": "e4f5061728394a5b6c7d8e9f0011223344556677889900aabbccddeeff223344",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-SUMAFRACC-V10",
+      "titulo": "Video · Sumar fracciones con distinto denominador",
+      "content_type": "video",
+      "content_ref": "avacom:mat7/fracciones/video-suma-fracciones",
+      "content_version": "1.0",
+      "content_huella": "f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff3344556677",
+      "duracion_seg": 421,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-DECIMALES-V10",
+      "titulo": "Lectura · De fracción a decimal y a porcentaje",
+      "content_type": "reading",
+      "content_ref": "avacom:mat7/fracciones/lectura-decimales",
+      "content_version": "1.0",
+      "content_huella": "061728394a5b6c7d8e9f0011223344556677889900aabbccddeeff4455667788",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-RAZON-V10",
+      "titulo": "Lectura · Razón, proporción y regla de tres",
+      "content_type": "reading",
+      "content_ref": "avacom:mat7/proporcionalidad/lectura-razon",
+      "content_version": "1.0",
+      "content_huella": "1728394a5b6c7d8e9f0011223344556677889900aabbccddeeff556677889900",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-DESCUENTOS-V10",
+      "titulo": "Video · Calcular descuentos y aumentos de precio",
+      "content_type": "video",
+      "content_ref": "avacom:mat7/proporcionalidad/video-descuentos",
+      "content_version": "1.0",
+      "content_huella": "28394a5b6c7d8e9f0011223344556677889900aabbccddeeff66778899001122",
+      "duracion_seg": 289,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-ANGULOS-V10",
+      "titulo": "Lectura · Ángulos entre rectas paralelas",
+      "content_type": "reading",
+      "content_ref": "avacom:mat7/geometria/lectura-angulos",
+      "content_version": "1.0",
+      "content_huella": "394a5b6c7d8e9f0011223344556677889900aabbccddeeff7788990011223344",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M7-AREAS-V10",
+      "titulo": "Video · Perímetro y área de figuras compuestas",
+      "content_type": "video",
+      "content_ref": "avacom:mat7/geometria/video-areas",
+      "content_version": "1.0",
+      "content_huella": "4a5b6c7d8e9f0011223344556677889900aabbccddeeff889900112233445566",
+      "duracion_seg": 358,
+      "autor_id": "docente-demo"
+    }
+  ],
+
+  "activities": [
+    {
+      "id": "ACT-M7-QUIZORDEN-V1",
+      "activity_ref": "avacom:mat7/enteros/quiz-orden",
+      "version": 1,
+      "titulo": "Quiz · Ordenar números enteros",
+      "descripcion": "Comparar enteros positivos y negativos y ubicarlos en la recta.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-TEMPERATURAS-V1",
+      "activity_ref": "avacom:mat7/enteros/tarea-temperaturas",
+      "version": 1,
+      "titulo": "Tarea · Registro de temperaturas de la semana",
+      "descripcion": "Anotar la temperatura mínima de siete días y calcular las diferencias entre ellas.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "teacher",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-QUIZCOMPARAR-V1",
+      "activity_ref": "avacom:mat7/fracciones/quiz-comparar",
+      "version": 1,
+      "titulo": "Quiz · Comparar fracciones",
+      "descripcion": "Decidir cuál de dos fracciones es mayor sin convertirlas a decimal.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-TAREARECETA-V1",
+      "activity_ref": "avacom:mat7/fracciones/tarea-receta",
+      "version": 1,
+      "titulo": "Tarea · Adaptar una receta para el doble de personas",
+      "descripcion": "Duplicar las cantidades de una receta familiar y documentar cada operación con fracciones.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "teacher",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-QUIZREGLA3-V1",
+      "activity_ref": "avacom:mat7/proporcionalidad/quiz-regla-de-tres",
+      "version": 1,
+      "titulo": "Quiz · Regla de tres simple",
+      "descripcion": "Resolver situaciones de proporcionalidad directa en seis reactivos.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-TAREAMERCADO-V1",
+      "activity_ref": "avacom:mat7/proporcionalidad/tarea-mercado",
+      "version": 1,
+      "titulo": "Tarea · Comparar precios por kilo en el mercado",
+      "descripcion": "Registrar el precio de cinco productos en dos presentaciones y decidir cuál conviene.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "mixed",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-QUIZANGULOS-V1",
+      "activity_ref": "avacom:mat7/geometria/quiz-angulos",
+      "version": 1,
+      "titulo": "Quiz · Ángulos entre paralelas",
+      "descripcion": "Hallar ángulos correspondientes, alternos internos y suplementarios.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M7-PLANOSALON-V1",
+      "activity_ref": "avacom:mat7/geometria/tarea-plano-salon",
+      "version": 1,
+      "titulo": "Tarea · Plano del salón a escala",
+      "descripcion": "Medir el salón, dibujarlo a escala y calcular su perímetro y su área.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "teacher",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    }
+  ],
+
+  "sections": [
+    {
+      "codigo": "section.enteros",
+      "titulo": "Números enteros",
+      "orden": 1,
+      "lessons": [
+        {
+          "codigo": "lesson.recta-numerica",
+          "titulo": "La recta numérica y el orden",
+          "descripcion": "Ubicar enteros positivos y negativos y compararlos.",
+          "competency_framework": "PDA 1.1",
+          "learning_outcome": "Ordena números enteros y los ubica en la recta numérica.",
+          "skills": "Interpretar el signo como posición respecto al cero.",
+          "attitudes_values": "Curiosidad por encontrar números negativos en la vida diaria.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/enteros/lectura-recta-numerica", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/enteros/quiz-orden", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.operaciones-enteros",
+          "titulo": "Suma, resta y multiplicación de enteros",
+          "descripcion": "Operar con enteros aplicando la regla de los signos.",
+          "competency_framework": "PDA 1.2",
+          "learning_outcome": "Resuelve operaciones con números enteros en contextos concretos.",
+          "skills": "Aplicar la regla de los signos y verificar con la recta numérica.",
+          "attitudes_values": "Constancia para revisar el signo del resultado.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/enteros/video-signos", "content_version": "1.0" },
+            { "orden": 2, "tipo": "contenido", "content_ref": "avacom:mat7/enteros/lectura-operaciones", "content_version": "1.0" },
+            { "orden": 3, "tipo": "actividad", "activity_ref": "avacom:mat7/enteros/tarea-temperaturas", "activity_version": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "section.fracciones-decimales",
+      "titulo": "Fracciones y decimales",
+      "orden": 2,
+      "lessons": [
+        {
+          "codigo": "lesson.equivalencia",
+          "titulo": "Fracciones equivalentes y comparación",
+          "descripcion": "Amplificar, simplificar y comparar fracciones.",
+          "competency_framework": "PDA 2.1",
+          "learning_outcome": "Identifica y genera fracciones equivalentes.",
+          "skills": "Hallar denominador común para comparar.",
+          "attitudes_values": "Perseverancia al comprobar sus resultados.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/fracciones/lectura-equivalencia", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/fracciones/quiz-comparar", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.operaciones-fracciones",
+          "titulo": "Operaciones con fracciones",
+          "descripcion": "Sumar, restar, multiplicar y dividir fracciones.",
+          "competency_framework": "PDA 2.2",
+          "learning_outcome": "Resuelve problemas que requieren operar con fracciones.",
+          "skills": "Homogeneizar denominadores y simplificar el resultado.",
+          "attitudes_values": "Limpieza en el registro del procedimiento.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/fracciones/video-suma-fracciones", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/fracciones/tarea-receta", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.decimales",
+          "titulo": "Decimales y porcentajes",
+          "descripcion": "Convertir entre fracción, decimal y porcentaje.",
+          "competency_framework": "PDA 2.3",
+          "learning_outcome": "Convierte entre las tres representaciones y elige la más cómoda.",
+          "skills": "Reconocer decimales periódicos al dividir.",
+          "attitudes_values": "Atención al redondear sin distorsionar el dato.",
+          "orden": 3,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/fracciones/lectura-decimales", "content_version": "1.0" },
+            { "orden": 2, "tipo": "referencia_externa", "elemento_ref": "avacom:mat7/anexos/tabla-conversiones", "elemento_version": "1.0" }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "section.proporcionalidad",
+      "titulo": "Proporcionalidad",
+      "orden": 3,
+      "lessons": [
+        {
+          "codigo": "lesson.razon",
+          "titulo": "Razón y proporción",
+          "descripcion": "Comparar magnitudes con razones y detectar proporcionalidad directa.",
+          "competency_framework": "PDA 3.1",
+          "learning_outcome": "Reconoce y resuelve situaciones de proporcionalidad directa.",
+          "skills": "Plantear y resolver una regla de tres simple.",
+          "attitudes_values": "Honestidad al reportar los datos que recolecta.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/proporcionalidad/lectura-razon", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/proporcionalidad/quiz-regla-de-tres", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.porcentajes-aplicados",
+          "titulo": "Porcentajes en la vida diaria",
+          "descripcion": "Calcular descuentos, aumentos y propinas.",
+          "competency_framework": "PDA 3.2",
+          "learning_outcome": "Aplica porcentajes para tomar decisiones de compra.",
+          "skills": "Estimar mentalmente un 10 % y a partir de él los demás.",
+          "attitudes_values": "Criterio para comparar antes de decidir.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/proporcionalidad/video-descuentos", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/proporcionalidad/tarea-mercado", "activity_version": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "section.geometria",
+      "titulo": "Geometría y medición",
+      "orden": 4,
+      "lessons": [
+        {
+          "codigo": "lesson.angulos",
+          "titulo": "Ángulos y rectas",
+          "descripcion": "Ángulos complementarios, suplementarios y los que se forman entre paralelas.",
+          "competency_framework": "PDA 4.1",
+          "learning_outcome": "Halla medidas de ángulos justificando cada paso.",
+          "skills": "Reconocer parejas de ángulos iguales en una figura.",
+          "attitudes_values": "Rigor al justificar por qué dos ángulos miden lo mismo.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/geometria/lectura-angulos", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/geometria/quiz-angulos", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.perimetro-area",
+          "titulo": "Perímetro y área",
+          "descripcion": "Calcular perímetro y área de figuras planas y compuestas.",
+          "competency_framework": "PDA 4.2",
+          "learning_outcome": "Descompone una figura compuesta para hallar su área.",
+          "skills": "Elegir la unidad adecuada y convertirla si hace falta.",
+          "attitudes_values": "Cuidado al medir y al reportar unidades.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat7/geometria/video-areas", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat7/geometria/tarea-plano-salon", "activity_version": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}

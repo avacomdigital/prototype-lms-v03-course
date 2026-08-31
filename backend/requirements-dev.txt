@@ -1,0 +1,6 @@
+# Dependencias sólo para pruebas y diagnóstico. No se instalan en el Master de la sede.
+-r requirements.txt
+
+# Cliente WebSocket usado por scripts/Invoke-EndpointProof.ps1 para verificar
+# presencia y difusión contra un Daphne real (los tests de Channels no necesitan red).
+websockets==17.0.1

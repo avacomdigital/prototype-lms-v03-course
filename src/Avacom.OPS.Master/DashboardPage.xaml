@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Avacom.OPS.Core.Models;assembly=Avacom.OPS.Core"
+             xmlns:local="clr-namespace:Avacom.OPS.Master"
+             x:Class="Avacom.OPS.Master.DashboardPage"
+             x:DataType="local:DashboardViewModel"
+             Background="{StaticResource PageGradient}">
+    <Grid ColumnDefinitions="248,*" RowDefinitions="*">
+        <!-- Navegación translúcida: el contenido permanece en superficies sólidas. -->
+        <Border Grid.Column="0" Margin="18" Padding="20" BackgroundColor="#CFFFFFFF" Stroke="#EFFFFFFF" StrokeThickness="1">
+            <Border.StrokeShape><RoundRectangle CornerRadius="24" /></Border.StrokeShape>
+            <Border.Shadow><Shadow Brush="#617785" Offset="8,10" Radius="24" Opacity="0.14" /></Border.Shadow>
+            <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="24">
+                <Image Source="avacom_logo.png" HeightRequest="42" HorizontalOptions="Start" Aspect="AspectFit" />
+                <VerticalStackLayout Grid.Row="1" Spacing="5">
+                    <Label Text="OPS MASTER" Style="{StaticResource Eyebrow}" />
+                    <Label Text="Aula conectada" FontSize="18" FontAttributes="Bold" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Row="2" Spacing="8">
+                    <Button Text="⌂  Resumen" Command="{Binding ShowOverviewCommand}" Style="{StaticResource NavButton}" />
+                    <Button Text="＋  Crear curso" Command="{Binding ShowCreateCommand}" Style="{StaticResource NavButton}" />
+                    <Button Text="⬓  Importar curso" Command="{Binding ShowImportCommand}" Style="{StaticResource NavButton}" />
+                    <Button Text="◎  Estudiantes" Command="{Binding ShowStudentsCommand}" Style="{StaticResource NavButton}" />
+                    <Button Text="↗  Resultados" Command="{Binding ShowResultsCommand}" Style="{StaticResource NavButton}" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Row="3" Spacing="12">
+                    <Border Padding="14,12" BackgroundColor="#F3F7F7" StrokeThickness="0">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Ellipse WidthRequest="10" HeightRequest="10" Fill="#A1A1AA" VerticalOptions="Center">
+                                <Ellipse.Triggers>
+                                    <DataTrigger TargetType="Ellipse" Binding="{Binding IsApiOnline}" Value="True"><Setter Property="Fill" Value="{StaticResource Success}" /></DataTrigger>
+                                    <DataTrigger TargetType="Ellipse" Binding="{Binding IsApiOffline}" Value="True"><Setter Property="Fill" Value="{StaticResource Danger}" /></DataTrigger>
+                                </Ellipse.Triggers>
+                            </Ellipse>
+                            <Label Grid.Column="1" Text="{Binding ApiStatusText}" FontSize="11" TextColor="{StaticResource Muted}" LineBreakMode="WordWrap" />
+                        </Grid>
+                    </Border>
+                    <Button Text="Cerrar aplicación" Command="{Binding CloseCommand}" Style="{StaticResource NavButton}" TextColor="{StaticResource Danger}" />
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" Padding="20,18,28,24" RowDefinitions="Auto,*" RowSpacing="20">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="18">
+                <VerticalStackLayout Spacing="3">
+                    <Label Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
+                    <Label Text="{Binding PageSubtitle}" TextColor="{StaticResource Muted}" FontSize="14" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                    <Border Padding="16,10" BackgroundColor="#DDFDF3" StrokeThickness="0">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                        <HorizontalStackLayout Spacing="8">
+                            <Ellipse WidthRequest="9" HeightRequest="9" Fill="{StaticResource Success}" VerticalOptions="Center" />
+                            <Label Text="{Binding ConnectionStatus}" FontSize="12" TextColor="#087747" VerticalTextAlignment="Center" MaxLines="2" MaximumWidthRequest="340" />
+                        </HorizontalStackLayout>
+                    </Border>
+                    <Button Text="Actualizar" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="52" />
+                </HorizontalStackLayout>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <!-- RESUMEN -->
+                <ScrollView IsVisible="{Binding IsOverview}">
+                    <VerticalStackLayout Spacing="22" Padding="2,2,8,24">
+                        <CollectionView ItemsSource="{Binding Courses}" SelectionMode="None" HeightRequest="76">
+                            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Horizontal" ItemSpacing="12" /></CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:Course">
+                                    <Button Text="{Binding Title}" Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectCourseCommand}" CommandParameter="{Binding .}"
+                                            Style="{StaticResource SecondaryButton}" HeightRequest="58" FontSize="14" />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <Grid ColumnDefinitions="1.65*,1*" ColumnSpacing="22">
+                            <Border Style="{StaticResource SoftCard}" Padding="30">
+                                <VerticalStackLayout Spacing="18">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <VerticalStackLayout Spacing="8">
+                                            <Label Text="CURSO SELECCIONADO" Style="{StaticResource Eyebrow}" />
+                                            <Label Text="{Binding CourseTitle}" FontSize="30" FontAttributes="Bold" />
+                                            <Label Text="{Binding CourseDescription}" TextColor="{StaticResource Muted}" FontSize="15" MaxLines="3" />
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="1" Padding="16,9" BackgroundColor="#E8F8F1" StrokeThickness="0" VerticalOptions="Start">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                            <Label Text="{Binding CourseStatus}" TextColor="{StaticResource Success}" FontAttributes="Bold" FontSize="12" />
+                                        </Border>
+                                    </Grid>
+                                    <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                        <VerticalStackLayout><Label Text="{Binding SectionCount}" FontSize="26" FontAttributes="Bold" /><Label Text="Secciones" TextColor="{StaticResource Muted}" /></VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="1"><Label Text="{Binding LessonCount}" FontSize="26" FontAttributes="Bold" /><Label Text="Lecciones" TextColor="{StaticResource Muted}" /></VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="2"><Label Text="{Binding StudentCount}" FontSize="26" FontAttributes="Bold" /><Label Text="Estudiantes" TextColor="{StaticResource Muted}" /></VerticalStackLayout>
+                                    </Grid>
+                                    <Border Padding="18" BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                            <Border WidthRequest="48" HeightRequest="48" BackgroundColor="#FDEBEC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape><Label Text="?" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" /></Border>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="3" VerticalOptions="Center"><Label Text="{Binding QuizTitle}" FontAttributes="Bold" /><Label Text="{Binding QuizMeta}" TextColor="{StaticResource Muted}" FontSize="12" /></VerticalStackLayout>
+                                            <Button Grid.Column="2" Text="Ver resultados" Command="{Binding ShowResultsCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="50" />
+                                        </Grid>
+                                    </Border>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <VerticalStackLayout Grid.Column="1" Spacing="22">
+                                <Border Style="{StaticResource SoftCard}">
+                                    <VerticalStackLayout Spacing="16">
+                                        <Label Text="Red del aula" Style="{StaticResource SectionTitle}" />
+                                        <Label Text="Comparte esta dirección con los estudiantes" TextColor="{StaticResource Muted}" FontSize="13" />
+                                        <Border Padding="16" BackgroundColor="#EFF8FB" Stroke="#CFEAF3"><Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape><Label Text="{Binding StudentUrl}" TextColor="#006B91" FontSize="17" FontAttributes="Bold" /></Border>
+                                        <Label Text="{Binding AddressHint}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                        <Button Text="Copiar dirección" Command="{Binding CopyStudentUrlCommand}" Style="{StaticResource PrimaryButton}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Border Style="{StaticResource SoftCard}">
+                                    <VerticalStackLayout Spacing="14">
+                                        <Grid ColumnDefinitions="*,Auto"><Label Text="Actividad" Style="{StaticResource SectionTitle}" /><Border Grid.Column="1" Padding="12,7" BackgroundColor="#E8F8F1" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape><Label Text="LIVE" TextColor="{StaticResource Success}" FontAttributes="Bold" FontSize="11" /></Border></Grid>
+                                        <Grid ColumnDefinitions="*,*">
+                                            <VerticalStackLayout><Label Text="{Binding ConnectedStudents}" FontSize="28" FontAttributes="Bold" /><Label Text="Conectados ahora" TextColor="{StaticResource Muted}" FontSize="12" /></VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1"><Label Text="{Binding AverageLabel}" FontSize="28" FontAttributes="Bold" /><Label Text="Promedio" TextColor="{StaticResource Muted}" FontSize="12" /></VerticalStackLayout>
+                                        </Grid>
+                                        <Label Text="{Binding CompletionLabel}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <Border Style="{StaticResource SoftCard}">
+                            <VerticalStackLayout Spacing="18">
+                                <Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="Estructura del curso" Style="{StaticResource SectionTitle}" /><Label Text="La misma jerarquía que navega el estudiante" TextColor="{StaticResource Muted}" FontSize="13" /></VerticalStackLayout><Label Grid.Column="1" Text="{Binding FrameworkLabel}" TextColor="{StaticResource Info}" FontAttributes="Bold" VerticalOptions="Center" /></Grid>
+                                <CollectionView ItemsSource="{Binding SelectedCourse.Sections}" SelectionMode="None">
+                                    <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Horizontal" ItemSpacing="16" /></CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:CourseSection">
+                                            <Border WidthRequest="340" Padding="20" BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}">
+                                                <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                                <VerticalStackLayout Spacing="12">
+                                                    <Label Text="{Binding NumberLabel}" Style="{StaticResource Eyebrow}" />
+                                                    <Label Text="{Binding Title}" FontSize="18" FontAttributes="Bold" />
+                                                    <CollectionView ItemsSource="{Binding Lessons}" SelectionMode="None">
+                                                        <CollectionView.ItemTemplate><DataTemplate x:DataType="models:Lesson"><Grid ColumnDefinitions="Auto,*" Padding="0,8" ColumnSpacing="10"><Border WidthRequest="30" HeightRequest="30" BackgroundColor="White" Stroke="{StaticResource Line}"><Border.StrokeShape><RoundRectangle CornerRadius="9" /></Border.StrokeShape><Label Text="{Binding Position}" HorizontalOptions="Center" VerticalOptions="Center" FontAttributes="Bold" /></Border><VerticalStackLayout Grid.Column="1"><Label Text="{Binding Title}" FontAttributes="Bold" FontSize="13" /><Label Text="{Binding ItemCountLabel}" TextColor="{StaticResource Muted}" FontSize="11" /></VerticalStackLayout></Grid></DataTemplate></CollectionView.ItemTemplate>
+                                                    </CollectionView>
+                                                </VerticalStackLayout>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <!-- CREAR CURSO -->
+                <ScrollView IsVisible="{Binding IsCreate}">
+                    <Grid ColumnDefinitions="1.45*,0.75*" ColumnSpacing="22" Padding="2,2,8,24">
+                        <Border Style="{StaticResource SoftCard}" Padding="32">
+                            <VerticalStackLayout Spacing="22">
+                                <Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="PASO A PASO" Style="{StaticResource Eyebrow}" /><Label Text="Diseña la base del curso" Style="{StaticResource SectionTitle}" /></VerticalStackLayout><Label Grid.Column="1" Text="{Binding WizardStep, StringFormat='Paso {0} de 3'}" TextColor="{StaticResource Muted}" VerticalOptions="Center" /></Grid>
+                                <ProgressBar Progress="{Binding WizardProgress}" ProgressColor="{StaticResource Primary}" BackgroundColor="#F3DCDD" HeightRequest="7" />
+
+                                <VerticalStackLayout IsVisible="{Binding IsWizardBasics}" Spacing="16">
+                                    <Label Text="Información esencial" FontSize="18" FontAttributes="Bold" />
+                                    <Label Text="Nombre del curso" TextColor="{StaticResource Muted}" FontSize="12" /><Border Style="{StaticResource FieldBorder}"><Entry Text="{Binding NewTitle}" Placeholder="Ej. Álgebra Octavo C" /></Border>
+                                    <Label Text="Descripción" TextColor="{StaticResource Muted}" FontSize="12" /><Border Style="{StaticResource FieldBorder}" Padding="16,10"><Editor Text="{Binding NewDescription}" Placeholder="¿Qué aprenderán los estudiantes?" HeightRequest="110" AutoSize="TextChanges" /></Border>
+                                    <Label Text="Marco curricular" TextColor="{StaticResource Muted}" FontSize="12" />
+                                    <Border Style="{StaticResource FieldBorder}">
+                                        <Picker ItemsSource="{Binding Frameworks}"
+                                                SelectedItem="{Binding NewFrameworkItem}"
+                                                ItemDisplayBinding="{Binding DisplayName}"
+                                                Title="Elige el marco curricular"
+                                                HeightRequest="52" />
+                                    </Border>
+                                    <!-- El marco decide cómo se llama el elemento de competencia en el paso 2. -->
+                                    <Border Padding="16,12" BackgroundColor="#EFF8FB" StrokeThickness="0">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                            <Border WidthRequest="34" HeightRequest="34" BackgroundColor="#D7EDF6" StrokeThickness="0" VerticalOptions="Start">
+                                                <Border.StrokeShape><RoundRectangle CornerRadius="11" /></Border.StrokeShape>
+                                                <Label Text="i" FontAttributes="Bold" TextColor="{StaticResource Info}" HorizontalOptions="Center" VerticalOptions="Center" />
+                                            </Border>
+                                            <Label Grid.Column="1" Text="{Binding FrameworkHelpText}" TextColor="{StaticResource Ink}" FontSize="13" VerticalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                    <Button Text="Continuar con la estructura" Command="{Binding NextWizardCommand}" Style="{StaticResource PrimaryButton}" />
+                                </VerticalStackLayout>
+
+                                <!--
+                                  ESTRUCTURA DINÁMICA
+                                  El docente decide cuántas secciones y cuántas lecciones lleva cada una.
+                                  BindableLayout anidado: DraftSections -> Lessons. Los comandos viven en
+                                  cada bloque (SectionDraftForm.AddLessonCommand, RemoveCommand), así el
+                                  binding no tiene que subir al BindingContext de la página.
+                                -->
+                                <VerticalStackLayout IsVisible="{Binding IsWizardStructure}" Spacing="16">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <VerticalStackLayout>
+                                            <Label Text="Secciones y lecciones" FontSize="18" FontAttributes="Bold" />
+                                            <Label Text="Añade los bloques que necesite el curso." TextColor="{StaticResource Muted}" FontSize="13" />
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="1" Padding="14,8" BackgroundColor="#EFF8FB" StrokeThickness="0" VerticalOptions="Center">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                            <Label Text="{Binding StructureSummary}" TextColor="{StaticResource Info}" FontSize="12" FontAttributes="Bold" />
+                                        </Border>
+                                    </Grid>
+
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding DraftSections}" Spacing="16">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="local:SectionDraftForm">
+                                                <Border BackgroundColor="{StaticResource Surface}" Stroke="{StaticResource Line}" StrokeThickness="1" Padding="22">
+                                                    <Border.StrokeShape><RoundRectangle CornerRadius="20" /></Border.StrokeShape>
+                                                    <Border.Shadow><Shadow Brush="#617785" Offset="4,6" Radius="16" Opacity="0.10" /></Border.Shadow>
+                                                    <VerticalStackLayout Spacing="14">
+
+                                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                                            <VerticalStackLayout VerticalOptions="Center">
+                                                                <Label Text="{Binding PositionLabel}" Style="{StaticResource Eyebrow}" />
+                                                                <Label Text="{Binding LessonCountLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                                            </VerticalStackLayout>
+                                                            <Button Grid.Column="2" Text="✕" Command="{Binding RemoveCommand}"
+                                                                    IsVisible="{Binding CanRemove}"
+                                                                    WidthRequest="56" HeightRequest="56" CornerRadius="18"
+                                                                    FontSize="17" BackgroundColor="#FDEBEC" TextColor="{StaticResource Danger}"
+                                                                    SemanticProperties.Description="Quitar esta sección" />
+                                                        </Grid>
+
+                                                        <Border Style="{StaticResource FieldBorder}">
+                                                            <Entry Text="{Binding Title}" Placeholder="Nombre de la sección · ej. Fundamentos del álgebra" />
+                                                        </Border>
+
+                                                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Lessons}" Spacing="12">
+                                                            <BindableLayout.ItemTemplate>
+                                                                <DataTemplate x:DataType="local:LessonDraftForm">
+                                                                    <Border BackgroundColor="#F7FAFB" StrokeThickness="0" Padding="18">
+                                                                        <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                                                        <VerticalStackLayout Spacing="10">
+                                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                                                <Label Text="{Binding PositionLabel}" Style="{StaticResource Eyebrow}" VerticalOptions="Center" />
+                                                                                <Button Grid.Column="1" Text="✕" Command="{Binding RemoveCommand}"
+                                                                                        IsVisible="{Binding CanRemove}"
+                                                                                        WidthRequest="48" HeightRequest="48" CornerRadius="15"
+                                                                                        FontSize="14" BackgroundColor="#FFFFFF" TextColor="{StaticResource Muted}"
+                                                                                        SemanticProperties.Description="Quitar esta lección" />
+                                                                            </Grid>
+                                                                            <Border Style="{StaticResource FieldBorder}">
+                                                                                <Entry Text="{Binding Title}" Placeholder="Título de la lección" />
+                                                                            </Border>
+                                                                            <Border Style="{StaticResource FieldBorder}" Padding="16,10">
+                                                                                <Editor Text="{Binding Description}" Placeholder="Descripción de la lección" HeightRequest="74" AutoSize="TextChanges" />
+                                                                            </Border>
+                                                                            <!-- El rótulo lo impone el marco curricular: DBA, PDA, Competencia… -->
+                                                                            <Label Text="{Binding CompetencyLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                                                            <Border Style="{StaticResource FieldBorder}">
+                                                                                <Entry Text="{Binding Competency}" Placeholder="{Binding CompetencyHint}" MaxLength="64" />
+                                                                            </Border>
+                                                                            <Label Text="Aprendizaje esperado" TextColor="{StaticResource Muted}" FontSize="12" />
+                                                                            <Border Style="{StaticResource FieldBorder}">
+                                                                                <Entry Text="{Binding LearningOutcome}" Placeholder="¿Qué podrá hacer el estudiante al terminar?" />
+                                                                            </Border>
+                                                                        </VerticalStackLayout>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </BindableLayout.ItemTemplate>
+                                                        </VerticalStackLayout>
+
+                                                        <Button Text="＋  Añadir lección" Command="{Binding AddLessonCommand}"
+                                                                HeightRequest="64" CornerRadius="18" FontSize="15"
+                                                                BackgroundColor="#EFF8FB" TextColor="{StaticResource Info}"
+                                                                SemanticProperties.Description="Añadir una lección a esta sección" />
+                                                    </VerticalStackLayout>
+                                                </Border>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+
+                                    <Button Text="＋  Añadir sección" Command="{Binding AddSectionCommand}"
+                                            HeightRequest="64" CornerRadius="20" FontSize="16" FontAttributes="Bold"
+                                            BackgroundColor="#FFFFFF" TextColor="{StaticResource Primary}"
+                                            BorderColor="{StaticResource Primary}" BorderWidth="1"
+                                            SemanticProperties.Description="Añadir una sección al curso" />
+
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                                        <Button Text="Atrás" Command="{Binding PreviousWizardCommand}" Style="{StaticResource SecondaryButton}" />
+                                        <Button Grid.Column="1" Text="Revisar curso" Command="{Binding NextWizardCommand}" Style="{StaticResource PrimaryButton}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout IsVisible="{Binding IsWizardReview}" Spacing="18">
+                                    <Label Text="Todo listo para crear" FontSize="18" FontAttributes="Bold" />
+                                    <Border Padding="22" BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                        <VerticalStackLayout Spacing="10">
+                                            <Label Text="{Binding NewTitle}" FontSize="24" FontAttributes="Bold" />
+                                            <Label Text="{Binding NewDescription}" TextColor="{StaticResource Muted}" />
+                                            <Label Text="{Binding StructureSummary}" TextColor="{StaticResource Info}" FontAttributes="Bold" />
+                                            <Label Text="{Binding FrameworkHelpText}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                    <!-- Índice real de lo que se va a crear, para revisar antes de guardar. -->
+                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding DraftSections}" Spacing="10">
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="local:SectionDraftForm">
+                                                <VerticalStackLayout Spacing="6">
+                                                    <Label Text="{Binding HeaderText}" FontAttributes="Bold" FontSize="14" />
+                                                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Lessons}" Spacing="3" Margin="14,0,0,0">
+                                                        <BindableLayout.ItemTemplate>
+                                                            <DataTemplate x:DataType="local:LessonDraftForm">
+                                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                                    <Label Text="{Binding HeaderText}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                                                    <Label Grid.Column="1" Text="{Binding Competency}" TextColor="{StaticResource Info}" FontSize="12" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </BindableLayout.ItemTemplate>
+                                                    </VerticalStackLayout>
+                                                </VerticalStackLayout>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </VerticalStackLayout>
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12"><Button Text="Atrás" Command="{Binding PreviousWizardCommand}" Style="{StaticResource SecondaryButton}" /><Button Grid.Column="1" Text="Crear curso" Command="{Binding CreateCourseCommand}" Style="{StaticResource PrimaryButton}" /></Grid>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource SoftCard}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="16">
+                                <Label Text="Qué se crea" Style="{StaticResource SectionTitle}" />
+                                <Label Text="01  Curso en borrador" FontAttributes="Bold" />
+                                <Label Text="Título, descripción, marco curricular y docente OPS." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="02  La estructura que definas" FontAttributes="Bold" />
+                                <Label Text="{Binding StructureSummary}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="03  Competencias del marco" FontAttributes="Bold" />
+                                <Label Text="{Binding FrameworkHelpText}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="04  Sin tablas extra" FontAttributes="Bold" />
+                                <Label Text="Se guardan las entidades exactas del modelo entregado." TextColor="{StaticResource Muted}" FontSize="13" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </ScrollView>
+
+                <!--
+                  IMPORTAR CURSO
+                  Tres pasos deliberados: abrir el archivo, revisar qué trae, confirmar.
+                  La instalación la hace Django en una transacción; si falla, la base
+                  queda como estaba y el motivo se muestra aquí, porque la OPS no tiene
+                  teclado ni consola donde ir a buscarlo.
+                -->
+                <ScrollView IsVisible="{Binding IsImport}">
+                    <Grid ColumnDefinitions="1.35*,0.85*" ColumnSpacing="22" Padding="2,2,8,24">
+                        <Border Style="{StaticResource SoftCard}" Padding="32" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="20">
+                                <VerticalStackLayout>
+                                    <Label Text="PAQUETE DE CURSO" Style="{StaticResource Eyebrow}" />
+                                    <Label Text="Importar desde un archivo" Style="{StaticResource SectionTitle}" />
+                                    <Label Text="El paquete trae la estructura completa del curso: secciones, lecciones, materiales y actividades."
+                                           TextColor="{StaticResource Muted}" FontSize="13" />
+                                </VerticalStackLayout>
+
+                                <!-- PASO 1 · abrir el archivo -->
+                                <Button Text="⬓  Abrir archivo .json"
+                                        Command="{Binding PickPackageCommand}"
+                                        Style="{StaticResource PrimaryButton}" />
+
+                                <Border IsVisible="{Binding HasImportFile}" Padding="16,12"
+                                        BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                        <Border WidthRequest="40" HeightRequest="40" BackgroundColor="#E6F4FB" StrokeThickness="0">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="13" /></Border.StrokeShape>
+                                            <Label Text="▤" TextColor="{StaticResource Info}" HorizontalOptions="Center" VerticalOptions="Center" />
+                                        </Border>
+                                        <Label Grid.Column="1" Text="{Binding ImportFileName}" VerticalOptions="Center" FontAttributes="Bold" FontSize="14" />
+                                        <Button Grid.Column="2" Text="✕" Command="{Binding ClearImportCommand}"
+                                                WidthRequest="48" HeightRequest="48" CornerRadius="15" FontSize="14"
+                                                BackgroundColor="#FFFFFF" TextColor="{StaticResource Muted}"
+                                                SemanticProperties.Description="Quitar el archivo elegido" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- PASO 2 · qué trae el paquete -->
+                                <VerticalStackLayout IsVisible="{Binding HasImportPreview}" Spacing="14">
+                                    <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                    <Label Text="QUÉ TRAE EL PAQUETE" Style="{StaticResource Eyebrow}" />
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                        <Border Padding="16,14" BackgroundColor="#F7FAFB" StrokeThickness="0">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                            <VerticalStackLayout>
+                                                <Label Text="{Binding ImportPreview.Sections}" FontSize="26" FontAttributes="Bold" />
+                                                <Label Text="secciones" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            </VerticalStackLayout>
+                                        </Border>
+                                        <Border Grid.Column="1" Padding="16,14" BackgroundColor="#F7FAFB" StrokeThickness="0">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                            <VerticalStackLayout>
+                                                <Label Text="{Binding ImportPreview.Lessons}" FontSize="26" FontAttributes="Bold" />
+                                                <Label Text="lecciones" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            </VerticalStackLayout>
+                                        </Border>
+                                        <Border Grid.Column="2" Padding="16,14" BackgroundColor="#F7FAFB" StrokeThickness="0">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                            <VerticalStackLayout>
+                                                <Label Text="{Binding ImportPreview.Items}" FontSize="26" FontAttributes="Bold" />
+                                                <Label Text="ítems" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </Grid>
+                                    <Label Text="{Binding ImportPreview.ContentSummary}" TextColor="{StaticResource Muted}" FontSize="13" />
+
+                                    <!-- Qué va a pasar al confirmar, dicho en una frase -->
+                                    <Border Padding="16,13" BackgroundColor="#EFF8FB" StrokeThickness="0">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                        <Label Text="{Binding ImportPreview.Intent}" TextColor="{StaticResource Ink}" FontSize="13" />
+                                    </Border>
+
+                                    <!-- El paquete declara su course_id, no su nombre ni su marco: eso lo pone el docente -->
+                                    <VerticalStackLayout IsVisible="{Binding ImportNeedsDetails}" Spacing="10">
+                                        <Label Text="Nombre del curso" TextColor="{StaticResource Muted}" FontSize="12" />
+                                        <Border Style="{StaticResource FieldBorder}">
+                                            <Entry Text="{Binding ImportTitle}" Placeholder="Ej. Fracciones y proporcionalidad · 6.º" />
+                                        </Border>
+                                        <Label Text="Marco curricular" TextColor="{StaticResource Muted}" FontSize="12" />
+                                        <Border Style="{StaticResource FieldBorder}">
+                                            <Picker ItemsSource="{Binding Frameworks}"
+                                                    SelectedItem="{Binding ImportFramework}"
+                                                    ItemDisplayBinding="{Binding DisplayName}"
+                                                    Title="Elige el marco curricular" HeightRequest="52" />
+                                        </Border>
+                                    </VerticalStackLayout>
+
+                                    <!-- PASO 3 · confirmar -->
+                                    <Button Text="Importar y publicar"
+                                            Command="{Binding ImportPackageCommand}"
+                                            Style="{StaticResource PrimaryButton}" />
+                                </VerticalStackLayout>
+
+                                <!-- Resultado -->
+                                <Border IsVisible="{Binding HasImportResult}" Padding="20"
+                                        BackgroundColor="#E9F7F0" StrokeThickness="0">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="{Binding ImportResult.Headline}" FontAttributes="Bold" FontSize="16" />
+                                        <Label Text="{Binding ImportResult.Detail}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                        <Label Text="{Binding ImportResult.VersionId, StringFormat='Versión instalada: {0}'}"
+                                               TextColor="{StaticResource Muted}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <Label Text="{Binding ImportStatus}" TextColor="{StaticResource Ink}" FontSize="13" />
+                                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Primary}" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border Grid.Column="1" Style="{StaticResource SoftCard}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="16">
+                                <Label Text="Cómo funciona" Style="{StaticResource SectionTitle}" />
+                                <Label Text="01  Abres el archivo" FontAttributes="Bold" />
+                                <Label Text="Se lee y se valida sin escribir nada en la base." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="02  Revisas qué trae" FontAttributes="Bold" />
+                                <Label Text="Secciones, lecciones, ítems y qué pasará al confirmar." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="03  Confirmas" FontAttributes="Bold" />
+                                <Label Text="Se instala en una sola transacción. Si algo falla, nada queda a medias." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="04  Aparece en las tabletas" FontAttributes="Bold" />
+                                <Label Text="El curso queda publicado y los estudiantes lo ven al recargar." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="Importar dos veces el mismo paquete no duplica nada." TextColor="{StaticResource Info}" FontSize="12" FontAttributes="Bold" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </ScrollView>
+
+                <!-- ESTUDIANTES -->
+                <ScrollView IsVisible="{Binding IsStudents}">
+                    <Grid ColumnDefinitions="0.8*,1.2*" ColumnSpacing="22" Padding="2,2,8,24">
+                        <Border Style="{StaticResource SoftCard}" VerticalOptions="Start" Padding="30">
+                            <VerticalStackLayout Spacing="18"><Label Text="ASIGNAR A CURSO" Style="{StaticResource Eyebrow}" /><Label Text="{Binding CourseTitle}" Style="{StaticResource SectionTitle}" /><Label Text="Escribe el nombre o identificador que usa el estudiante. La inscripción se guarda en m05_curso_estudiante." TextColor="{StaticResource Muted}" FontSize="13" /><Border Style="{StaticResource FieldBorder}"><Entry Text="{Binding AssignmentPerson}" Placeholder="Ej. camila-torres" /></Border><Button Text="Asignar estudiante" Command="{Binding AssignStudentCommand}" Style="{StaticResource PrimaryButton}" /></VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource SoftCard}" Padding="28">
+                            <VerticalStackLayout Spacing="16"><Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="Estudiantes asignados" Style="{StaticResource SectionTitle}" /><Label Text="Inscripciones activas del curso" TextColor="{StaticResource Muted}" FontSize="13" /></VerticalStackLayout><Border Grid.Column="1" Padding="14,8" BackgroundColor="#EFF8FB" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape><Label Text="{Binding StudentCount}" TextColor="{StaticResource Info}" FontAttributes="Bold" /></Border></Grid><CollectionView ItemsSource="{Binding SelectedCourse.Enrollments}" SelectionMode="None"><CollectionView.EmptyView><Label Text="Todavía no hay estudiantes asignados." TextColor="{StaticResource Muted}" Margin="0,30" /></CollectionView.EmptyView><CollectionView.ItemTemplate><DataTemplate x:DataType="models:CourseEnrollment"><Grid ColumnDefinitions="Auto,*,Auto" Padding="0,14" ColumnSpacing="14"><Border WidthRequest="44" HeightRequest="44" BackgroundColor="#FDEBEC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape><Label Text="●" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" /></Border><VerticalStackLayout Grid.Column="1" VerticalOptions="Center"><Label Text="{Binding PersonId}" FontAttributes="Bold" /><Label Text="Identificador del LMS" TextColor="{StaticResource Muted}" FontSize="11" /></VerticalStackLayout><Label Grid.Column="2" Text="{Binding Status}" TextColor="{StaticResource Success}" VerticalOptions="Center" /></Grid></DataTemplate></CollectionView.ItemTemplate></CollectionView></VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </ScrollView>
+
+                <!-- RESULTADOS -->
+                <ScrollView IsVisible="{Binding IsResults}">
+                    <VerticalStackLayout Spacing="20" Padding="2,2,8,24">
+                        <Grid ColumnDefinitions="2*,*,*" ColumnSpacing="16"><Border Style="{StaticResource SoftCard}"><Grid ColumnDefinitions="Auto,*" ColumnSpacing="15"><Border WidthRequest="54" HeightRequest="54" BackgroundColor="#FDEBEC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape><Label Text="?" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" /></Border><VerticalStackLayout Grid.Column="1" VerticalOptions="Center"><Label Text="{Binding QuizTitle}" FontAttributes="Bold" FontSize="17" /><Label Text="{Binding QuizMeta}" TextColor="{StaticResource Muted}" FontSize="12" /></VerticalStackLayout></Grid></Border><Border Grid.Column="1" Style="{StaticResource SoftCard}"><VerticalStackLayout><Label Text="{Binding ConnectedStudents}" FontSize="30" FontAttributes="Bold" TextColor="{StaticResource Success}" /><Label Text="Conectados en vivo" TextColor="{StaticResource Muted}" /></VerticalStackLayout></Border><Border Grid.Column="2" Style="{StaticResource SoftCard}"><VerticalStackLayout><Label Text="{Binding AverageLabel}" FontSize="30" FontAttributes="Bold" /><Label Text="Promedio del grupo" TextColor="{StaticResource Muted}" /></VerticalStackLayout></Border></Grid>
+                        <Border Style="{StaticResource SoftCard}" Padding="28">
+                            <VerticalStackLayout Spacing="16"><Grid ColumnDefinitions="2*,*,*,*" Padding="10,4"><Label Text="ESTUDIANTE" Style="{StaticResource Eyebrow}" /><Label Grid.Column="1" Text="AVANCE" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Muted}" /><Label Grid.Column="2" Text="ESTADO" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Muted}" /><Label Grid.Column="3" Text="NOTA" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Muted}" /></Grid><CollectionView ItemsSource="{Binding Results}" SelectionMode="None"><CollectionView.EmptyView><Label Text="Aún no hay intentos para esta actividad." TextColor="{StaticResource Muted}" Margin="10,30" /></CollectionView.EmptyView><CollectionView.ItemTemplate><DataTemplate x:DataType="models:QuizAttempt"><Border Padding="16" Margin="0,4" BackgroundColor="#F8FAFA" Stroke="#EEF2F3"><Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape><Border.GestureRecognizers><TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectResultCommand}" CommandParameter="{Binding .}" /></Border.GestureRecognizers><Grid ColumnDefinitions="2*,*,*,*" ColumnSpacing="16"><VerticalStackLayout><Label Text="{Binding StudentName}" FontAttributes="Bold" /><Label Text="{Binding PersonId}" TextColor="{StaticResource Muted}" FontSize="11" /></VerticalStackLayout><VerticalStackLayout Grid.Column="1" VerticalOptions="Center"><ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Info}" BackgroundColor="#DDECEF" /><Label Text="{Binding Answered, StringFormat='{0} respondidas'}" FontSize="10" TextColor="{StaticResource Muted}" /></VerticalStackLayout><Label Grid.Column="2" Text="{Binding StatusLabel}" VerticalOptions="Center" /><Label Grid.Column="3" Text="{Binding ScoreLabel}" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" /></Grid></Border></DataTemplate></CollectionView.ItemTemplate></CollectionView></VerticalStackLayout>
+                        </Border>
+                        <HorizontalStackLayout HorizontalOptions="End" Spacing="10"><Button Text="Copiar diagnóstico" Command="{Binding CopyDiagnosticsCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="52" /><Button Text="Abrir registros" Command="{Binding OpenLogsFolderCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="52" /></HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <!-- Detalle de una entrega -->
+                <Grid IsVisible="{Binding HasSelectedDetail}" BackgroundColor="#66000000" Padding="80,50">
+                    <Border Style="{StaticResource SoftCard}" Padding="32" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest="760" MaximumHeightRequest="700">
+                        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="18"><Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="Detalle del intento" Style="{StaticResource Eyebrow}" /><Label Text="{Binding SelectedDetail.Summary.StudentName}" Style="{StaticResource SectionTitle}" /><Label Text="{Binding SelectedDetail.Summary.ScoreLabel}" TextColor="{StaticResource Success}" FontSize="18" FontAttributes="Bold" /></VerticalStackLayout><Button Grid.Column="1" Text="Cerrar" Command="{Binding CloseDetailCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="48" /></Grid><CollectionView Grid.Row="1" ItemsSource="{Binding SelectedDetail.Answers}" SelectionMode="None"><CollectionView.ItemTemplate><DataTemplate x:DataType="models:QuizAnswerResult"><VerticalStackLayout Padding="4,12" Spacing="4"><Label Text="{Binding Question}" FontAttributes="Bold" /><Label Text="{Binding Selected, StringFormat='Respuesta: {0}'}" TextColor="{StaticResource Muted}" /><Label Text="{Binding Correct, StringFormat='Correcta: {0}'}" TextColor="{StaticResource Success}" /></VerticalStackLayout></DataTemplate></CollectionView.ItemTemplate></CollectionView><Label Grid.Row="2" Text="La calificación se calcula automáticamente al finalizar." TextColor="{StaticResource Muted}" FontSize="12" /></Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>

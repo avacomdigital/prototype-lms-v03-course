@@ -1,0 +1,180 @@
+# ==========================================================================
+# AVACOM · Prototipo de cursos LAN (.NET MAUI + Django REST Framework)
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# Secretos y configuración por sede. NUNCA versionar: contienen la clave de
+# Django y los ajustes locales de cada sede.
+# El archivo de referencia versionado es .env.example
+# --------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.local.env
+secrets.json
+
+# --------------------------------------------------------------------------
+# Certificados y material de firma (MSIX, APK, keystores).
+# Filtrarlos permitiría firmar un APK falso con identidad de AVACOM.
+# --------------------------------------------------------------------------
+*.pfx
+*.p12
+*.snk
+*.cer
+*.crt
+*.key
+*.keystore
+*.jks
+
+# ==========================================================================
+# Python / Django / backend
+# ==========================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+.Python
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Bases de datos locales SQLite: se generan mediante migraciones + seed y no
+# deben confundirse con el archivo de referencia entregado fuera del repo.
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# Archivos generados en tiempo de ejecución
+logs/
+*.log
+backend/staticfiles/
+backend/media/
+backend/logs/
+
+# Herramientas de prueba y cobertura
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+.mypy_cache/
+.ruff_cache/
+
+# ==========================================================================
+# .NET / MAUI
+# ==========================================================================
+**/[Bb]in/
+**/[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+artifacts/
+project.lock.json
+project.fragment.lock.json
+*.nuget.props
+*.nuget.targets
+BenchmarkDotNet.Artifacts/
+
+# Salidas de empaquetado de las apps del profesor y del estudiante
+**/AppPackages/
+**/BundleArtifacts/
+*.msix
+*.msixbundle
+*.msixupload
+*.appx
+*.appxbundle
+*.appxupload
+*.apk
+*.aab
+*.ipa
+*.cer.txt
+
+# Recursos generados por el SDK de MAUI a partir de los SVG
+**/Resources/raw/generated/
+**/Platforms/Android/Resources/resource.designer.cs
+**/Platforms/Android/Resources/Resource.designer.cs
+
+# Resultados de pruebas
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+*.VisualState.xml
+TestResult.xml
+
+# ==========================================================================
+# Visual Studio / Rider / VS Code
+# ==========================================================================
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.DotSettings.user
+.build/
+*.ncrunch*
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# ==========================================================================
+# Sistema operativo
+# ==========================================================================
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+.DS_Store
+.AppleDouble
+._*
+
+# ==========================================================================
+# Datos y artefactos del prototipo
+# ==========================================================================
+# Imágenes Docker exportadas para llevar a una sede sin Internet (cientos de MB)
+*.tar
+*.tar.gz
+
+# Volúmenes o datos locales de servicios auxiliares
+data/
+
+# Trazas o datos de sesión si alguna vez se copian al repositorio
+pending-answers.json
+student.log
+master.log
+
+# Herramientas y cachés de agentes/CI locales
+.codex_deps/
+.appdata/
+.dotnet-home/
+.docker-config/
+.claude/settings.local.json
+
+# Carga y salida del instalador wizard: se regeneran con Build-AvacomOPSPackage.ps1
+installer/payload/
+
+# El instalador publicado SI se versiona: es el entregable que una sede descarga
+# del repositorio. Hace falta reincluir el directorio y no solo el archivo,
+# porque git no entra en un directorio excluido y una negacion dentro de el no
+# se evaluaria nunca.
+!installer/dist/
+installer/dist/*
+!installer/dist/AvacomOPSCore-Setup-*.exe

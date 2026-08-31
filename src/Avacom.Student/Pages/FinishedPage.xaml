@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Avacom.Student.ViewModels"
+             x:Class="Avacom.Student.Pages.FinishedPage"
+             x:DataType="vm:FinishedViewModel"
+             Background="{StaticResource PageGradient}">
+    <ScrollView>
+        <Grid Padding="{OnIdiom Desktop=46, Tablet=32, Phone=18}" MinimumHeightRequest="640">
+            <Border Style="{StaticResource SoftCard}" MaximumWidthRequest="680" HorizontalOptions="Center" VerticalOptions="Center" Padding="{OnIdiom Desktop=44, Tablet=36, Phone=24}">
+                <VerticalStackLayout Spacing="20" HorizontalOptions="Fill">
+                    <Image Source="avacom_logo.png" HeightRequest="45" HorizontalOptions="Center" Aspect="AspectFit" />
+                    <Border WidthRequest="92" HeightRequest="92" BackgroundColor="#E8F8F1" StrokeThickness="0" HorizontalOptions="Center"><Border.StrokeShape><RoundRectangle CornerRadius="28" /></Border.StrokeShape><Label Text="✓" FontSize="46" TextColor="{StaticResource Success}" HorizontalOptions="Center" VerticalOptions="Center" /></Border>
+                    <VerticalStackLayout Spacing="6"><Label Text="ACTIVIDAD ENTREGADA" Style="{StaticResource Eyebrow}" HorizontalTextAlignment="Center" /><Label Text="{Binding StudentName, StringFormat='¡Listo, {0}!'}" Style="{StaticResource PageTitle}" HorizontalTextAlignment="Center" /><Label Text="{Binding CourseTitle}" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" /></VerticalStackLayout>
+                    <Border Padding="24" BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}"><Border.StrokeShape><RoundRectangle CornerRadius="20" /></Border.StrokeShape><Grid ColumnDefinitions="*,*"><VerticalStackLayout><Label Text="{Binding ScoreLabel}" FontSize="34" FontAttributes="Bold" HorizontalTextAlignment="Center" /><Label Text="Nota" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" /></VerticalStackLayout><VerticalStackLayout Grid.Column="1"><Label Text="{Binding PercentageLabel}" FontSize="34" FontAttributes="Bold" TextColor="{StaticResource Success}" HorizontalTextAlignment="Center" /><Label Text="Resultado" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" /></VerticalStackLayout></Grid></Border>
+                    <Label Text="{Binding Message}" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" FontSize="15" />
+                    <Button Text="Volver al curso" Command="{Binding BackToCourseCommand}" Style="{StaticResource PrimaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </ScrollView>
+</ContentPage>

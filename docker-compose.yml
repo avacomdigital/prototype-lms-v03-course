@@ -1,0 +1,13 @@
+services:
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env}
+    environment:
+      DB_ENGINE: sqlite
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_exam && daphne -b 0.0.0.0 -p 8000 exam_master.asgi:application"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend/db.sqlite3:/app/db.sqlite3
+      - ./logs/backend:/app/logs

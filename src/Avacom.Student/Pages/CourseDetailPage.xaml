@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Avacom.OPS.Core.Models;assembly=Avacom.OPS.Core"
+             xmlns:vm="clr-namespace:Avacom.Student.ViewModels"
+             x:Class="Avacom.Student.Pages.CourseDetailPage"
+             x:DataType="vm:CourseDetailViewModel"
+             Background="{StaticResource PageGradient}">
+    <Grid Padding="{OnIdiom Desktop=32, Tablet=24, Phone=14}" RowDefinitions="Auto,*" RowSpacing="18">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <Button Text="←" Command="{Binding BackCommand}" Style="{StaticResource SecondaryButton}" WidthRequest="64" />
+            <Image Grid.Column="1" Source="avacom_logo.png" HeightRequest="38" HorizontalOptions="Start" Aspect="AspectFit" />
+            <VerticalStackLayout Grid.Column="2" VerticalOptions="Center"><Label Text="{Binding StudentName}" FontAttributes="Bold" HorizontalTextAlignment="End" /><Label Text="Estudiante" TextColor="{StaticResource Muted}" FontSize="11" HorizontalTextAlignment="End" /></VerticalStackLayout>
+        </Grid>
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout MaximumWidthRequest="1120" HorizontalOptions="Center" Spacing="22" Padding="0,4,0,32">
+                <Border Style="{StaticResource SoftCard}" Padding="{OnIdiom Desktop=34, Tablet=28, Phone=22}">
+                    <Grid ColumnDefinitions="{OnIdiom Desktop='*,Auto', Tablet='*,Auto', Phone='*'}" RowDefinitions="{OnIdiom Phone='Auto,Auto', Default='Auto'}" RowSpacing="14">
+                        <VerticalStackLayout Spacing="8"><HorizontalStackLayout Spacing="10"><Label Text="{Binding Course.Framework.Name}" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Course.StatusLabel}" TextColor="{StaticResource Success}" FontSize="11" /></HorizontalStackLayout><Label Text="{Binding Course.Title}" Style="{StaticResource PageTitle}" /><Label Text="{Binding Course.Description}" TextColor="{StaticResource Muted}" MaxLines="4" /><Label Text="{Binding Course.Summary}" TextColor="{StaticResource Info}" FontAttributes="Bold" /></VerticalStackLayout>
+                        <Border Grid.Column="{OnIdiom Phone=0, Default=1}" Grid.Row="{OnIdiom Phone=1, Default=0}" Padding="18,12" BackgroundColor="#FDEBEC" StrokeThickness="0" VerticalOptions="Center"><Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape><Label Text="ÁLGEBRA · 8B" TextColor="{StaticResource Primary}" FontAttributes="Bold" /></Border>
+                    </Grid>
+                </Border>
+                <Label Text="{Binding Status}" TextColor="{StaticResource Muted}" />
+                <CollectionView ItemsSource="{Binding Course.Sections}" SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:CourseSection">
+                            <VerticalStackLayout Spacing="14" Margin="0,8,0,18">
+                                <Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="{Binding NumberLabel}" Style="{StaticResource Eyebrow}" /><Label Text="{Binding Title}" Style="{StaticResource SectionTitle}" /></VerticalStackLayout><Label Grid.Column="1" Text="{Binding LessonCountLabel}" TextColor="{StaticResource Muted}" VerticalOptions="Center" /></Grid>
+                                <CollectionView ItemsSource="{Binding Lessons}" SelectionMode="None">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:Lesson">
+                                            <Border Style="{StaticResource SoftCard}" Margin="0,7" Padding="{OnIdiom Desktop=26, Tablet=22, Phone=18}">
+                                                <VerticalStackLayout Spacing="14">
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14"><Border WidthRequest="46" HeightRequest="46" BackgroundColor="#EDF8FC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape><Label Text="{Binding Position}" TextColor="{StaticResource Info}" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" /></Border><VerticalStackLayout Grid.Column="1"><Label Text="{Binding Title}" FontSize="18" FontAttributes="Bold" /><Label Text="{Binding Description}" TextColor="{StaticResource Muted}" FontSize="12" MaxLines="3" /></VerticalStackLayout></Grid>
+                                                    <Border Padding="14,10" BackgroundColor="#F7FAFB" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="13" /></Border.StrokeShape><Label Text="{Binding LearningOutcome}" TextColor="{StaticResource Muted}" FontSize="11" MaxLines="3" /></Border>
+                                                    <CollectionView ItemsSource="{Binding Items}" SelectionMode="None">
+                                                        <CollectionView.ItemTemplate>
+                                                            <DataTemplate x:DataType="models:LessonItem">
+                                                                <Border Padding="14" Margin="0,4" BackgroundColor="White" Stroke="{StaticResource Line}">
+                                                                    <Border.StrokeShape><RoundRectangle CornerRadius="15" /></Border.StrokeShape>
+                                                                    <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenItemCommand}" CommandParameter="{Binding .}" /></Border.GestureRecognizers>
+                                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12"><Border WidthRequest="38" HeightRequest="38" BackgroundColor="#FDEBEC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape><Label Text="{Binding TypeIcon}" TextColor="{StaticResource Primary}" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" /></Border><VerticalStackLayout Grid.Column="1" VerticalOptions="Center"><Label Text="{Binding Title}" FontAttributes="Bold" FontSize="13" /><Label Text="{Binding Subtitle}" TextColor="{StaticResource Muted}" FontSize="11" /></VerticalStackLayout><Label Grid.Column="2" Text="›" FontSize="28" TextColor="{StaticResource Muted}" VerticalOptions="Center" /></Grid>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </CollectionView.ItemTemplate>
+                                                    </CollectionView>
+                                                </VerticalStackLayout>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

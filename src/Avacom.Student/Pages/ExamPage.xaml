@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Avacom.Student.ViewModels"
+             x:Class="Avacom.Student.Pages.ExamPage"
+             x:DataType="vm:ExamViewModel"
+             Background="{StaticResource PageGradient}">
+    <Grid Padding="{OnIdiom Desktop=30, Tablet=22, Phone=12}" RowDefinitions="Auto,*,Auto" RowSpacing="{OnIdiom Desktop=20, Tablet=16, Phone=10}">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+            <Button Text="×" Command="{Binding ExitCommand}" Style="{StaticResource SecondaryButton}" WidthRequest="64" />
+            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                <Label x:Name="RecoveryTarget" Text="{Binding ActivityTitle}" FontSize="{OnIdiom Desktop=22, Tablet=20, Phone=16}" FontAttributes="Bold" LineBreakMode="TailTruncation">
+                    <Label.GestureRecognizers><TapGestureRecognizer Tapped="OnRecoveryTap" /></Label.GestureRecognizers>
+                </Label>
+                <Label Text="{Binding StudentName}" TextColor="{StaticResource Muted}" FontSize="12" />
+            </VerticalStackLayout>
+            <Border Grid.Column="2" Padding="14,8" BackgroundColor="#E8F8F1" StrokeThickness="0" VerticalOptions="Center"><Border.StrokeShape><RoundRectangle CornerRadius="17" /></Border.StrokeShape><Label Text="{Binding Status}" TextColor="{StaticResource Success}" FontSize="11" MaxLines="2" /></Border>
+        </Grid>
+
+        <Border Grid.Row="1" Style="{StaticResource SoftCard}" Padding="{OnIdiom Desktop=36, Tablet=28, Phone=17}">
+            <Grid RowDefinitions="Auto,Auto,*" RowSpacing="{OnIdiom Desktop=22, Tablet=18, Phone=11}">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="8">
+                    <Label Text="{Binding ProgressLabel}" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                    <Label Grid.Column="1" Text="{Binding AnsweredLabel}" TextColor="{StaticResource Muted}" FontSize="11" />
+                    <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Progress="{Binding ProgressValue}" ProgressColor="{StaticResource Primary}" BackgroundColor="#F1D8DA" HeightRequest="8" />
+                </Grid>
+                <VerticalStackLayout Grid.Row="1" Spacing="7">
+                    <Label Text="{Binding Category}" Style="{StaticResource Eyebrow}" />
+                    <Label Text="{Binding CurrentQuestion.Text}" FontSize="{OnIdiom Desktop=27, Tablet=23, Phone=18}" FontAttributes="Bold" MaxLines="{OnIdiom Desktop=4, Tablet=4, Phone=5}" />
+                </VerticalStackLayout>
+                <CollectionView Grid.Row="2" ItemsSource="{Binding Options}" SelectionMode="None">
+                    <CollectionView.ItemsLayout>
+                        <OnIdiom x:TypeArguments="ItemsLayout">
+                            <OnIdiom.Desktop><GridItemsLayout Orientation="Vertical" Span="2" VerticalItemSpacing="14" HorizontalItemSpacing="14" /></OnIdiom.Desktop>
+                            <OnIdiom.Tablet><GridItemsLayout Orientation="Vertical" Span="2" VerticalItemSpacing="12" HorizontalItemSpacing="12" /></OnIdiom.Tablet>
+                            <OnIdiom.Phone><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></OnIdiom.Phone>
+                        </OnIdiom>
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AnswerOptionViewModel">
+                            <Border Padding="{OnIdiom Desktop='18,16', Tablet='16,14', Phone='13,10'}" BackgroundColor="#F6F9FA" Stroke="{StaticResource Line}" StrokeThickness="1" MinimumHeightRequest="{OnIdiom Desktop=76, Tablet=70, Phone=58}">
+                                <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                <Border.GestureRecognizers><TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectOptionCommand}" CommandParameter="{Binding .}" /></Border.GestureRecognizers>
+                                <Border.Triggers><DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True"><Setter Property="BackgroundColor" Value="#FDEBEC" /><Setter Property="Stroke" Value="{StaticResource Primary}" /><Setter Property="StrokeThickness" Value="2" /></DataTrigger></Border.Triggers>
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14"><Border WidthRequest="42" HeightRequest="42" BackgroundColor="White" Stroke="{StaticResource Line}"><Border.StrokeShape><RoundRectangle CornerRadius="13" /></Border.StrokeShape><Label Text="{Binding Letter}" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" /></Border><Label Grid.Column="1" Text="{Binding Text}" FontSize="{OnIdiom Desktop=16, Tablet=15, Phone=13}" VerticalTextAlignment="Center" /></Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,1.4*" ColumnSpacing="12">
+            <Button Text="Anterior" Command="{Binding PreviousCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="{Binding NextLabel}" Command="{Binding NextCommand}" Style="{StaticResource PrimaryButton}" />
+        </Grid>
+    </Grid>
+</ContentPage>

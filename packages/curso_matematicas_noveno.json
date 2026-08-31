@@ -1,0 +1,382 @@
+{
+  "schema": "avacom-course-package/v1",
+
+  "_comentario": [
+    "Paquete de prueba · Matemáticas Noveno grado · marco colombiano (MEN).",
+    "El elemento de competencia de cada lección es un DBA, que es como el MEN",
+    "llama a los Derechos Básicos de Aprendizaje. Al importarlo desde la OPS,",
+    "elige el marco 'MEN Colombia' para que el campo se rotule DBA.",
+    "",
+    "El paquete declara su course_id pero NO el título del curso ni su marco:",
+    "esos los aporta quien importa, porque son decisiones de la sede.",
+    "",
+    "Contiene 4 secciones, 8 lecciones y 18 ítems.",
+    "Los ids de recursos y actividades viajan en el paquete para que todos los",
+    "nodos offline resuelvan el mismo registro. Los ids de secciones, lecciones",
+    "e ítems los deriva el instalador de (curso, versión, orden)."
+  ],
+
+  "package": {
+    "package_id": "avacom.men.co.matematicas9",
+    "package_version": "1.0.0",
+    "operation": "install"
+  },
+
+  "course": {
+    "course_id": "CURSO-MAT9",
+    "version": 1
+  },
+
+  "publication": {
+    "activate_after_install": true
+  },
+
+  "version_meta": {
+    "instalada_por": "docente-demo",
+    "huella": "9a1c4e7b20d58f36a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60719",
+    "notas": "Versión inicial: números reales, factorización, funciones y trigonometría básica."
+  },
+
+  "resources": [
+    {
+      "id": "RES-M9-IRRACIONALES-V10",
+      "titulo": "Lectura · Números irracionales y la recta real",
+      "content_type": "reading",
+      "content_ref": "avacom:mat9/reales/lectura-irracionales",
+      "content_version": "1.0",
+      "content_huella": "1f2e3d4c5b6a798807162534435261708192a3b4c5d6e7f8091a2b3c4d5e6f70",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-POTENCIAS-V10",
+      "titulo": "Video · Propiedades de la potenciación",
+      "content_type": "video",
+      "content_ref": "avacom:mat9/reales/video-propiedades-potencias",
+      "content_version": "1.0",
+      "content_huella": "2a3b4c5d6e7f80910a1b2c3d4e5f6071829304152637485960718293a4b5c6d7",
+      "duracion_seg": 412,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-RADICALES-V10",
+      "titulo": "Lectura · Radicación y simplificación de radicales",
+      "content_type": "reading",
+      "content_ref": "avacom:mat9/reales/lectura-radicales",
+      "content_version": "1.0",
+      "content_huella": "3b4c5d6e7f8091a20b1c2d3e4f5061728394a5b6c7d8e9f0011223344556677a",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-PRODNOTABLES-V10",
+      "titulo": "Lectura · Productos notables",
+      "content_type": "reading",
+      "content_ref": "avacom:mat9/algebra/lectura-productos-notables",
+      "content_version": "1.0",
+      "content_huella": "4c5d6e7f8091a2b30c1d2e3f4051627384950a6b7c8d9e0f1122334455667788",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-FACTORIZAR-V10",
+      "titulo": "Video · Cinco casos de factorización",
+      "content_type": "video",
+      "content_ref": "avacom:mat9/algebra/video-factorizacion",
+      "content_version": "1.0",
+      "content_huella": "5d6e7f8091a2b3c40d1e2f30415263748596a0b1c2d3e4f5061728394a5b6c7d",
+      "duracion_seg": 638,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-FUNLINEAL-V10",
+      "titulo": "Lectura · Función lineal y función afín",
+      "content_type": "reading",
+      "content_ref": "avacom:mat9/funciones/lectura-funcion-lineal",
+      "content_version": "1.0",
+      "content_huella": "6e7f8091a2b3c4d50e1f20314253647586970a1b2c3d4e5f60718293a4b5c6d7",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-PENDIENTE-V10",
+      "titulo": "Video · Qué significa la pendiente",
+      "content_type": "video",
+      "content_ref": "avacom:mat9/funciones/video-pendiente",
+      "content_version": "1.0",
+      "content_huella": "7f8091a2b3c4d5e60f10213243546576879809a1b2c3d4e5f60718293a4b5c6d",
+      "duracion_seg": 375,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-PARABOLA-V10",
+      "titulo": "Lectura · La parábola y la función cuadrática",
+      "content_type": "reading",
+      "content_ref": "avacom:mat9/funciones/lectura-parabola",
+      "content_version": "1.0",
+      "content_huella": "8091a2b3c4d5e6f710213243546576879809a0b1c2d3e4f50617283940a1b2c3",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-PITAGORAS-V10",
+      "titulo": "Video · Demostración visual del teorema de Pitágoras",
+      "content_type": "video",
+      "content_ref": "avacom:mat9/geometria/video-pitagoras",
+      "content_version": "1.0",
+      "content_huella": "91a2b3c4d5e6f708112233445566778899a0b1c2d3e4f5061728394a5b6c7d8e",
+      "duracion_seg": 294,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "RES-M9-RAZONESTRIG-V10",
+      "titulo": "Lectura · Seno, coseno y tangente en el triángulo rectángulo",
+      "content_type": "reading",
+      "content_ref": "avacom:mat9/geometria/lectura-razones-trig",
+      "content_version": "1.0",
+      "content_huella": "a2b3c4d5e6f70819223344556677889900a1b2c3d4e5f60718293a4b5c6d7e8f",
+      "duracion_seg": null,
+      "autor_id": "docente-demo"
+    }
+  ],
+
+  "activities": [
+    {
+      "id": "ACT-M9-QUIZREALES-V1",
+      "activity_ref": "avacom:mat9/reales/quiz-clasificacion",
+      "version": 1,
+      "titulo": "Quiz · Clasificar números reales",
+      "descripcion": "Distinguir racionales de irracionales en ocho reactivos de selección.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M9-TAREARADIC-V1",
+      "activity_ref": "avacom:mat9/reales/tarea-simplificar",
+      "version": 1,
+      "titulo": "Tarea · Simplificar diez expresiones con radicales",
+      "descripcion": "Resolver en el cuaderno, fotografiar el procedimiento y subirlo.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "teacher",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M9-QUIZPRODNOT-V1",
+      "activity_ref": "avacom:mat9/algebra/quiz-productos",
+      "version": 1,
+      "titulo": "Quiz · Productos notables",
+      "descripcion": "Reconocer el producto notable que corresponde a cada expresión.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M9-TAREAFACTOR-V1",
+      "activity_ref": "avacom:mat9/algebra/tarea-factorizar",
+      "version": 1,
+      "titulo": "Tarea · Factorizar y comprobar multiplicando",
+      "descripcion": "Factorizar seis polinomios y verificar cada resultado multiplicando de vuelta.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "mixed",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M9-QUIZLINEAL-V1",
+      "activity_ref": "avacom:mat9/funciones/quiz-lineal",
+      "version": 1,
+      "titulo": "Quiz · Pendiente e intercepto",
+      "descripcion": "Leer pendiente e intercepto a partir de una gráfica o de una tabla.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M9-QUIZPITAGORAS-V1",
+      "activity_ref": "avacom:mat9/geometria/quiz-pitagoras",
+      "version": 1,
+      "titulo": "Quiz · Teorema de Pitágoras",
+      "descripcion": "Hallar el lado que falta y decidir si un triángulo es rectángulo.",
+      "activity_type": "quiz",
+      "submission_type": "quiz",
+      "grading_type": "automatic",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    },
+    {
+      "id": "ACT-M9-TAREAALTURAS-V1",
+      "activity_ref": "avacom:mat9/geometria/tarea-alturas",
+      "version": 1,
+      "titulo": "Tarea · Medir la altura del colegio con trigonometría",
+      "descripcion": "Medir un ángulo de elevación y una distancia, y estimar la altura con la tangente.",
+      "activity_type": "assignment",
+      "submission_type": "file",
+      "grading_type": "teacher",
+      "max_score": 100,
+      "autor_id": "docente-demo"
+    }
+  ],
+
+  "sections": [
+    {
+      "codigo": "section.numeros-reales",
+      "titulo": "Números reales",
+      "orden": 1,
+      "lessons": [
+        {
+          "codigo": "lesson.irracionales",
+          "titulo": "Números irracionales",
+          "descripcion": "Reconocer que hay números que no se pueden escribir como fracción y ubicarlos en la recta.",
+          "competency_framework": "DBA 1",
+          "learning_outcome": "Utiliza los números reales en sus diferentes representaciones y reconoce los irracionales.",
+          "skills": "Ubicar raíces no exactas en la recta numérica y aproximarlas.",
+          "attitudes_values": "Curiosidad por los números que no cierran nunca.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/reales/lectura-irracionales", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat9/reales/quiz-clasificacion", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.potenciacion-radicacion",
+          "titulo": "Potenciación y radicación",
+          "descripcion": "Aplicar las propiedades de las potencias y simplificar radicales.",
+          "competency_framework": "DBA 2",
+          "learning_outcome": "Opera con potencias y raíces usando sus propiedades.",
+          "skills": "Simplificar expresiones con exponentes enteros y radicales.",
+          "attitudes_values": "Orden en el registro paso a paso del procedimiento.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/reales/video-propiedades-potencias", "content_version": "1.0" },
+            { "orden": 2, "tipo": "contenido", "content_ref": "avacom:mat9/reales/lectura-radicales", "content_version": "1.0" },
+            { "orden": 3, "tipo": "actividad", "activity_ref": "avacom:mat9/reales/tarea-simplificar", "activity_version": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "section.algebra",
+      "titulo": "Álgebra y factorización",
+      "orden": 2,
+      "lessons": [
+        {
+          "codigo": "lesson.productos-notables",
+          "titulo": "Productos notables",
+          "descripcion": "Reconocer el cuadrado de un binomio, la suma por diferencia y el cubo de un binomio.",
+          "competency_framework": "DBA 3",
+          "learning_outcome": "Identifica y aplica productos notables para operar más rápido.",
+          "skills": "Desarrollar productos notables sin multiplicar término a término.",
+          "attitudes_values": "Confianza para buscar el patrón antes de calcular.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/algebra/lectura-productos-notables", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat9/algebra/quiz-productos", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.factorizacion",
+          "titulo": "Factorización",
+          "descripcion": "Factor común, diferencia de cuadrados, trinomio cuadrado perfecto y trinomio de la forma x²+bx+c.",
+          "competency_framework": "DBA 3",
+          "learning_outcome": "Factoriza polinomios eligiendo el caso que corresponde.",
+          "skills": "Reconocer la estructura del polinomio antes de factorizar.",
+          "attitudes_values": "Perseverancia al comprobar el resultado multiplicando de vuelta.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/algebra/video-factorizacion", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat9/algebra/tarea-factorizar", "activity_version": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "section.funciones",
+      "titulo": "Funciones lineales y cuadráticas",
+      "orden": 3,
+      "lessons": [
+        {
+          "codigo": "lesson.funcion-lineal",
+          "titulo": "Función lineal y afín",
+          "descripcion": "Relacionar tabla, gráfica y expresión algebraica de una función de primer grado.",
+          "competency_framework": "DBA 4",
+          "learning_outcome": "Propone modelos funcionales lineales entre dos variables.",
+          "skills": "Hallar pendiente e intercepto a partir de dos puntos.",
+          "attitudes_values": "Interés por describir con una fórmula lo que se observa.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/funciones/lectura-funcion-lineal", "content_version": "1.0" },
+            { "orden": 2, "tipo": "contenido", "content_ref": "avacom:mat9/funciones/video-pendiente", "content_version": "1.0" },
+            { "orden": 3, "tipo": "actividad", "activity_ref": "avacom:mat9/funciones/quiz-lineal", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.funcion-cuadratica",
+          "titulo": "Función cuadrática",
+          "descripcion": "Reconocer la parábola, su vértice y sus cortes con el eje x.",
+          "competency_framework": "DBA 4",
+          "learning_outcome": "Interpreta la gráfica de una función cuadrática en un contexto.",
+          "skills": "Ubicar vértice y raíces a partir de la expresión.",
+          "attitudes_values": "Apertura para revisar una conjetura cuando la gráfica la contradice.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/funciones/lectura-parabola", "content_version": "1.0" },
+            { "orden": 2, "tipo": "referencia_externa", "elemento_ref": "avacom:mat9/anexos/plantilla-graficas", "elemento_version": "1.0" }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "section.pitagoras",
+      "titulo": "Teorema de Pitágoras y trigonometría",
+      "orden": 4,
+      "lessons": [
+        {
+          "codigo": "lesson.pitagoras",
+          "titulo": "Teorema de Pitágoras",
+          "descripcion": "Aplicar el teorema para hallar lados y para decidir si un triángulo es rectángulo.",
+          "competency_framework": "DBA 5",
+          "learning_outcome": "Usa el teorema de Pitágoras para resolver problemas con distancias.",
+          "skills": "Identificar cuál lado es la hipotenusa antes de operar.",
+          "attitudes_values": "Cuidado al medir y al reportar unidades.",
+          "orden": 1,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/geometria/video-pitagoras", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat9/geometria/quiz-pitagoras", "activity_version": 1 }
+          ]
+        },
+        {
+          "codigo": "lesson.razones-trigonometricas",
+          "titulo": "Razones trigonométricas",
+          "descripcion": "Definir seno, coseno y tangente y usarlas para hallar lados o ángulos.",
+          "competency_framework": "DBA 5",
+          "learning_outcome": "Resuelve triángulos rectángulos con razones trigonométricas.",
+          "skills": "Elegir la razón adecuada según los datos disponibles.",
+          "attitudes_values": "Honestidad al reportar las medidas que tomó en campo.",
+          "orden": 2,
+          "estado": "publicado",
+          "items": [
+            { "orden": 1, "tipo": "contenido", "content_ref": "avacom:mat9/geometria/lectura-razones-trig", "content_version": "1.0" },
+            { "orden": 2, "tipo": "actividad", "activity_ref": "avacom:mat9/geometria/tarea-alturas", "activity_version": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}

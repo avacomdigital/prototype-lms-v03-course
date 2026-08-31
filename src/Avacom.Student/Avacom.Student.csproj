@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net9.0-android35.0;net9.0-windows10.0.19041.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Avacom.Student</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
+    <ApplicationTitle>AVACOM Student</ApplicationTitle>
+    <ApplicationId>com.avacom.student</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+    <!--
+      En Debug la app del estudiante se compila SIN empaquetar, para poder lanzarla con
+      `dotnet run` o F5 durante el desarrollo. En Release se mantiene el MSIX, que es
+      obligatorio para el aprovisionamiento kiosco (Assigned Access) en los equipos de
+      los estudiantes.
+
+      Tiene que estar aquí y no en la línea de comandos: los targets que generan
+      resources.pri leen la propiedad antes, y con -p: el PRI queda sin los recursos de
+      tema de WinUI (37 KB en vez de ~1,3 MB). La app compila pero muere al arrancar con
+        Cannot locate resource from 'ms-appx:///Microsoft.UI.Xaml/Themes/themeresources.xaml'
+    -->
+    <WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' And '$(Configuration)' == 'Debug'">None</WindowsPackageType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Avacom.OPS.Core\Avacom.OPS.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#ECF5F8" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#ECF5F8" BaseSize="128,128" />
+
+    <!-- El SVG se rasteriza en tiempo de compilación y se referencia como .png.
+         El nombre no puede llevar guiones: MAUI aplica las reglas de nombres de
+         recurso de Android, así que el archivo es avacom_logo.svg.
+         BaseSize amplía el original de 71x19 para que no se vea borroso al
+         mostrarlo más grande ni en pantallas de alta densidad. -->
+    <MauiImage Include="Resources\Images\*" />
+    <MauiImage Update="Resources\Images\avacom_logo.svg" BaseSize="284,76" />
+    <MauiFont Include="Resources\Fonts\*" />
+  </ItemGroup>
+  <ItemGroup>
+    <MauiXaml Update="**\*.xaml" Generator="MSBuild:Compile" />
+  </ItemGroup>
+</Project>

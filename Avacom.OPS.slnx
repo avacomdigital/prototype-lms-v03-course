@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/Avacom.OPS.Core/Avacom.OPS.Core.csproj" />
+  <Project Path="src/Avacom.Student/Avacom.Student.csproj" />
+  <Project Path="src/Avacom.OPS.Master/Avacom.OPS.Master.csproj" />
+  <Project Path="tests/Avacom.OPS.Core.Tests/Avacom.OPS.Core.Tests.csproj" />
+</Solution>
