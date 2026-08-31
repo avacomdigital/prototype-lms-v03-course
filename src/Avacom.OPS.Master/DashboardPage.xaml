@@ -21,6 +21,7 @@
                     <Button Text="⌂  Resumen" Command="{Binding ShowOverviewCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="＋  Crear curso" Command="{Binding ShowCreateCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="⬓  Importar curso" Command="{Binding ShowImportCommand}" Style="{StaticResource NavButton}" />
+                    <Button Text="⊖  Eliminar curso" Command="{Binding ShowDeleteCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="◎  Estudiantes" Command="{Binding ShowStudentsCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="↗  Resultados" Command="{Binding ShowResultsCommand}" Style="{StaticResource NavButton}" />
                 </VerticalStackLayout>
@@ -349,6 +350,14 @@
                   queda como estaba y el motivo se muestra aquí, porque la OPS no tiene
                   teclado ni consola donde ir a buscarlo.
                 -->
+                <!--
+                  IMPORTAR CURSO · SCORM, CMI5 o el paquete nativo
+                  Tres pasos: abrir el archivo, revisar qué trae, confirmar.
+                  El ESTÁNDAR concreto lo detecta el backend leyendo el descriptor
+                  del .zip (imsmanifest.xml o cmi5.xml); la extensión no alcanza.
+                  Al confirmar se registra la presencia en m05_curso_host, que es
+                  lo que responde «¿este curso está instalado en esta OPS?».
+                -->
                 <ScrollView IsVisible="{Binding IsImport}">
                     <Grid ColumnDefinitions="1.35*,0.85*" ColumnSpacing="22" Padding="2,2,8,24">
                         <Border Style="{StaticResource SoftCard}" Padding="32" VerticalOptions="Start">
@@ -356,12 +365,23 @@
                                 <VerticalStackLayout>
                                     <Label Text="PAQUETE DE CURSO" Style="{StaticResource Eyebrow}" />
                                     <Label Text="Importar desde un archivo" Style="{StaticResource SectionTitle}" />
-                                    <Label Text="El paquete trae la estructura completa del curso: secciones, lecciones, materiales y actividades."
+                                    <Label Text="Acepta SCORM 1.2, SCORM 2004 y CMI5 en .zip, o el paquete nativo de AVACOM en .json. El formato se detecta solo."
                                            TextColor="{StaticResource Muted}" FontSize="13" />
                                 </VerticalStackLayout>
 
+                                <!-- Identidad de esta OPS: la clave de m05_curso_host -->
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                    <VerticalStackLayout VerticalOptions="Center">
+                                        <Label Text="ESTA OPS" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="host_id" TextColor="{StaticResource Muted}" FontSize="11" />
+                                    </VerticalStackLayout>
+                                    <Border Grid.Column="1" Style="{StaticResource FieldBorder}">
+                                        <Entry Text="{Binding HostId}" Placeholder="Ej. OPS-BOGOTA-A3" />
+                                    </Border>
+                                </Grid>
+
                                 <!-- PASO 1 · abrir el archivo -->
-                                <Button Text="⬓  Abrir archivo .json"
+                                <Button Text="⬓  Abrir paquete (.zip o .json)"
                                         Command="{Binding PickPackageCommand}"
                                         Style="{StaticResource PrimaryButton}" />
 
@@ -381,46 +401,41 @@
                                     </Grid>
                                 </Border>
 
+                                <!-- Formato y descriptor detectados · solo para .zip SCORM/CMI5 -->
+                                <Border IsVisible="{Binding HasZipDetected}" Padding="18"
+                                        BackgroundColor="#F3EFFA" StrokeThickness="0">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="FORMATO DETECTADO" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding ImportZipDetected.FormatLabel}" FontSize="20" FontAttributes="Bold" />
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowDefinitions="Auto,Auto" RowSpacing="4">
+                                            <Label Text="Descriptor" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <Label Grid.Column="1" Text="{Binding ImportZipDetected.DescriptorLabel}" FontSize="12" />
+                                            <Label Grid.Row="1" Text="Identificador" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding ImportZipDetected.PackageIdentifier}"
+                                                   FontSize="12" LineBreakMode="TailTruncation" />
+                                        </Grid>
+                                    </VerticalStackLayout>
+                                </Border>
+
                                 <!-- PASO 2 · qué trae el paquete -->
                                 <VerticalStackLayout IsVisible="{Binding HasImportPreview}" Spacing="14">
                                     <BoxView HeightRequest="1" Color="{StaticResource Line}" />
                                     <Label Text="QUÉ TRAE EL PAQUETE" Style="{StaticResource Eyebrow}" />
-                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-                                        <Border Padding="16,14" BackgroundColor="#F7FAFB" StrokeThickness="0">
-                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
-                                            <VerticalStackLayout>
-                                                <Label Text="{Binding ImportPreview.Sections}" FontSize="26" FontAttributes="Bold" />
-                                                <Label Text="secciones" TextColor="{StaticResource Muted}" FontSize="12" />
-                                            </VerticalStackLayout>
-                                        </Border>
-                                        <Border Grid.Column="1" Padding="16,14" BackgroundColor="#F7FAFB" StrokeThickness="0">
-                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
-                                            <VerticalStackLayout>
-                                                <Label Text="{Binding ImportPreview.Lessons}" FontSize="26" FontAttributes="Bold" />
-                                                <Label Text="lecciones" TextColor="{StaticResource Muted}" FontSize="12" />
-                                            </VerticalStackLayout>
-                                        </Border>
-                                        <Border Grid.Column="2" Padding="16,14" BackgroundColor="#F7FAFB" StrokeThickness="0">
-                                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
-                                            <VerticalStackLayout>
-                                                <Label Text="{Binding ImportPreview.Items}" FontSize="26" FontAttributes="Bold" />
-                                                <Label Text="ítems" TextColor="{StaticResource Muted}" FontSize="12" />
-                                            </VerticalStackLayout>
-                                        </Border>
-                                    </Grid>
-                                    <Label Text="{Binding ImportPreview.ContentSummary}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                    <Label Text="{Binding ImportSummary}" FontSize="20" FontAttributes="Bold" />
+                                    <Label Text="{Binding ImportContentSummary}" TextColor="{StaticResource Muted}" FontSize="13" />
 
                                     <!-- Qué va a pasar al confirmar, dicho en una frase -->
                                     <Border Padding="16,13" BackgroundColor="#EFF8FB" StrokeThickness="0">
                                         <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
-                                        <Label Text="{Binding ImportPreview.Intent}" TextColor="{StaticResource Ink}" FontSize="13" />
+                                        <Label Text="{Binding ImportIntent}" TextColor="{StaticResource Ink}" FontSize="13" />
                                     </Border>
 
-                                    <!-- El paquete declara su course_id, no su nombre ni su marco: eso lo pone el docente -->
+                                    <!-- El paquete declara su identificador, no su nombre ni su marco -->
                                     <VerticalStackLayout IsVisible="{Binding ImportNeedsDetails}" Spacing="10">
                                         <Label Text="Nombre del curso" TextColor="{StaticResource Muted}" FontSize="12" />
                                         <Border Style="{StaticResource FieldBorder}">
-                                            <Entry Text="{Binding ImportTitle}" Placeholder="Ej. Fracciones y proporcionalidad · 6.º" />
+                                            <Entry Text="{Binding ImportTitle}" Placeholder="Ej. Matemáticas 6" />
                                         </Border>
                                         <Label Text="Marco curricular" TextColor="{StaticResource Muted}" FontSize="12" />
                                         <Border Style="{StaticResource FieldBorder}">
@@ -432,7 +447,7 @@
                                     </VerticalStackLayout>
 
                                     <!-- PASO 3 · confirmar -->
-                                    <Button Text="Importar y publicar"
+                                    <Button Text="Importar e instalar en esta OPS"
                                             Command="{Binding ImportPackageCommand}"
                                             Style="{StaticResource PrimaryButton}" />
                                 </VerticalStackLayout>
@@ -442,10 +457,38 @@
                                         BackgroundColor="#E9F7F0" StrokeThickness="0">
                                     <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
                                     <VerticalStackLayout Spacing="8">
-                                        <Label Text="{Binding ImportResult.Headline}" FontAttributes="Bold" FontSize="16" />
-                                        <Label Text="{Binding ImportResult.Detail}" TextColor="{StaticResource Muted}" FontSize="13" />
-                                        <Label Text="{Binding ImportResult.VersionId, StringFormat='Versión instalada: {0}'}"
-                                               TextColor="{StaticResource Muted}" FontSize="12" />
+                                        <Label Text="{Binding ImportHeadline}" FontAttributes="Bold" FontSize="16" />
+                                        <Label Text="{Binding ImportDetail}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <!--
+                                  La fila de m05_curso_host que quedó. Es la prueba visible
+                                  de que la presencia física se registró, y de que las dos
+                                  banderas son independientes.
+                                -->
+                                <Border IsVisible="{Binding HasImportHostRow}" Padding="20"
+                                        BackgroundColor="{StaticResource Surface}" Stroke="{StaticResource Line}">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                    <VerticalStackLayout Spacing="12">
+                                        <Label Text="m05_curso_host · PRESENCIA EN ESTA OPS" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding ImportHostRow.StateLabel}" FontSize="17" FontAttributes="Bold" />
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                                            <Label Text="host_id" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <Label Grid.Column="1" Text="{Binding ImportHostRow.HostId}" FontSize="12" />
+
+                                            <Label Grid.Row="1" Text="formato_contenido" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding ImportHostRow.ContentFormat}" FontSize="12" />
+
+                                            <Label Grid.Row="2" Text="presente_local" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <Label Grid.Row="2" Grid.Column="1" Text="{Binding ImportHostRow.PresentLocally}" FontSize="12" />
+
+                                            <Label Grid.Row="3" Text="disponible_estudiante" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <Label Grid.Row="3" Grid.Column="1" Text="{Binding ImportHostRow.AvailableToStudents}" FontSize="12" />
+                                        </Grid>
+                                        <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                        <Label Text="{Binding ImportHostRow.VersionLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                        <Label Text="{Binding ImportHostRow.DescriptorLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
                                     </VerticalStackLayout>
                                 </Border>
 
@@ -456,20 +499,197 @@
 
                         <Border Grid.Column="1" Style="{StaticResource SoftCard}" VerticalOptions="Start">
                             <VerticalStackLayout Spacing="16">
-                                <Label Text="Cómo funciona" Style="{StaticResource SectionTitle}" />
-                                <Label Text="01  Abres el archivo" FontAttributes="Bold" />
-                                <Label Text="Se lee y se valida sin escribir nada en la base." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <Label Text="Formatos que acepta" Style="{StaticResource SectionTitle}" />
+                                <Label Text="SCORM 1.2 · SCORM 2004" FontAttributes="Bold" />
+                                <Label Text="Un .zip con imsmanifest.xml. La organization se vuelve el curso; los item de nivel 1 y 2, secciones y lecciones."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                                <Label Text="02  Revisas qué trae" FontAttributes="Bold" />
-                                <Label Text="Secciones, lecciones, ítems y qué pasará al confirmar." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <Label Text="CMI5" FontAttributes="Bold" />
+                                <Label Text="Un .zip con cmi5.xml. El course se vuelve el curso; los block, secciones y lecciones; cada AU, una actividad."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                                <Label Text="03  Confirmas" FontAttributes="Bold" />
-                                <Label Text="Se instala en una sola transacción. Si algo falla, nada queda a medias." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <Label Text="Paquete AVACOM" FontAttributes="Bold" />
+                                <Label Text="Un .json con schema avacom-course-package/v1." TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                                <Label Text="04  Aparece en las tabletas" FontAttributes="Bold" />
-                                <Label Text="El curso queda publicado y los estudiantes lo ven al recargar." TextColor="{StaticResource Muted}" FontSize="13" />
+                                <Label Text="Los tres terminan en el mismo árbol" FontAttributes="Bold" />
+                                <Label Text="curso → sección → lección → ítem. El formato es de entrada, no un modelo distinto."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
                                 <Label Text="Importar dos veces el mismo paquete no duplica nada." TextColor="{StaticResource Info}" FontSize="12" FontAttributes="Bold" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </ScrollView>
+
+                <!-- ELIMINAR CURSO -->
+                <ScrollView IsVisible="{Binding IsDelete}">
+                    <Grid ColumnDefinitions="1.35*,0.85*" ColumnSpacing="22" Padding="2,2,8,24">
+                        <VerticalStackLayout Spacing="20">
+
+                            <!-- Resultado del último borrado. Va ARRIBA de la lista, no en lugar de
+                                 ella: lo que acaba de pasar y el estado actual se leen juntos. -->
+                            <Border IsVisible="{Binding HasDeleteResult}" Style="{StaticResource SoftCard}" Padding="30"
+                                    VerticalOptions="Start">
+                                <VerticalStackLayout Spacing="18">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="ELIMINADO" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding DeleteResult.Headline}" FontSize="20" FontAttributes="Bold" />
+                                        <Label Text="{Binding DeleteResult.Message}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                    </VerticalStackLayout>
+
+                                    <!--
+                                      El antes y el después que devolvió el backend. Es lo que
+                                      convierte la advertencia en algo comprobable en pantalla.
+                                    -->
+                                    <Border Padding="20" BackgroundColor="#E9F7F0" StrokeThickness="0">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                        <VerticalStackLayout Spacing="12">
+                                            <Label Text="LO ACADÉMICO, ANTES Y DESPUÉS" Style="{StaticResource Eyebrow}" />
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="7">
+                                                <Label Text="" />
+                                                <Label Grid.Column="1" Text="antes" Style="{StaticResource Eyebrow}" />
+                                                <Label Grid.Column="2" Text="después" Style="{StaticResource Eyebrow}" />
+
+                                                <Label Grid.Row="1" Text="Estudiantes matriculados" FontSize="13" />
+                                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding DeleteResult.Preserved.Before.Students}" FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                                                <Label Grid.Row="1" Grid.Column="2" Text="{Binding DeleteResult.Preserved.After.Students}" FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="End" />
+
+                                                <Label Grid.Row="2" Text="Lecciones con avance" FontSize="13" />
+                                                <Label Grid.Row="2" Grid.Column="1" Text="{Binding DeleteResult.Preserved.Before.ProgressRows}" FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                                                <Label Grid.Row="2" Grid.Column="2" Text="{Binding DeleteResult.Preserved.After.ProgressRows}" FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="End" />
+
+                                                <Label Grid.Row="3" Text="Intentos de quiz" FontSize="13" />
+                                                <Label Grid.Row="3" Grid.Column="1" Text="{Binding DeleteResult.Preserved.Before.QuizAttempts}" FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                                                <Label Grid.Row="3" Grid.Column="2" Text="{Binding DeleteResult.Preserved.After.QuizAttempts}" FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                                            </Grid>
+                                            <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                            <Label Text="{Binding DeleteResult.PreservedLabel}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource Success}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                    <Button Text="Entendido" Command="{Binding ShowDeleteCommand}"
+                                            Style="{StaticResource SecondaryButton}" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- PASO 1 · elegir la tarjeta del curso -->
+                            <VerticalStackLayout IsVisible="{Binding IsPickingDeletion}" Spacing="18">
+                                <Label Text="{Binding DeleteStatus}" TextColor="{StaticResource Muted}" FontSize="13" />
+
+                                <Border IsVisible="{Binding HasNoInstalledCourses}" Style="{StaticResource SoftCard}" Padding="32">
+                                    <VerticalStackLayout Spacing="10">
+                                        <Label Text="NADA INSTALADO" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="Esta OPS no tiene cursos" Style="{StaticResource SectionTitle}" />
+                                        <Label Text="Importa un paquete SCORM, CMI5 o AVACOM desde «Importar curso» y volverá a aparecer acá."
+                                               TextColor="{StaticResource Muted}" FontSize="13" />
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <CollectionView ItemsSource="{Binding InstalledCourses}" SelectionMode="None"
+                                                IsVisible="{Binding HasInstalledCourses}">
+                                    <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="16" /></CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:InstalledCourseCard">
+                                            <Border Style="{StaticResource SoftCard}" Padding="26">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                                                    <VerticalStackLayout Spacing="8">
+                                                        <Label Text="{Binding Name}" FontSize="21" FontAttributes="Bold" />
+                                                        <Label Text="{Binding VersionLabel}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                                        <HorizontalStackLayout Spacing="8">
+                                                            <Border Padding="12,6" BackgroundColor="#E8F8F1" StrokeThickness="0">
+                                                                <Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape>
+                                                                <Label Text="{Binding StateLabel}" TextColor="{StaticResource Success}" FontSize="11" FontAttributes="Bold" />
+                                                            </Border>
+                                                            <Border Padding="12,6" BackgroundColor="#F3EFFA" StrokeThickness="0">
+                                                                <Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape>
+                                                                <Label Text="{Binding ContentFormat}" FontSize="11" FontAttributes="Bold" />
+                                                            </Border>
+                                                        </HorizontalStackLayout>
+                                                        <!-- Lo que NO se va a perder, dicho en la tarjeta misma -->
+                                                        <Label Text="{Binding PreservedSummary}" TextColor="{StaticResource Info}" FontSize="12" Margin="0,4,0,0" />
+                                                    </VerticalStackLayout>
+                                                    <Button Grid.Column="1" Text="Eliminar" VerticalOptions="Center"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectForDeletionCommand}"
+                                                            CommandParameter="{Binding .}"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            TextColor="{StaticResource Danger}" HeightRequest="56" WidthRequest="132" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+
+                            <!-- PASO 2 · confirmar o cancelar -->
+                            <Border IsVisible="{Binding IsConfirmingDeletion}" Style="{StaticResource SoftCard}" Padding="34"
+                                    VerticalOptions="Start">
+                                <VerticalStackLayout Spacing="22">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="CONFIRMAR" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding CourseToDelete.Name}" FontSize="27" FontAttributes="Bold" />
+                                        <Label Text="{Binding CourseToDelete.VersionLabel}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                    </VerticalStackLayout>
+
+                                    <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+
+                                    <!-- Qué se va -->
+                                    <Border Padding="20" BackgroundColor="#FDEEEE" StrokeThickness="0">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                        <VerticalStackLayout Spacing="8">
+                                            <Label Text="SE RETIRA DE ESTA OPS" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Danger}" />
+                                            <Label Text="El contenido del curso: sus secciones, lecciones y materiales dejan de estar presentes en este equipo, y los estudiantes ya no podrán abrirlo."
+                                                   FontSize="13" />
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                    <!-- Qué se queda: la regla del prototipo, hecha explícita -->
+                                    <Border Padding="20" BackgroundColor="#E9F7F0" StrokeThickness="0">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                        <VerticalStackLayout Spacing="8">
+                                            <Label Text="SE CONSERVA" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Success}" />
+                                            <Label Text="{Binding CourseToDelete.PreservedSummary}" FontSize="14" FontAttributes="Bold" />
+                                            <Label Text="Las matrículas, el avance por lección y las calificaciones no se tocan. Si el curso se vuelve a importar, el progreso reaparece donde estaba."
+                                                   FontSize="13" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                    </Border>
+
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                                        <Button Text="Cancelar" Command="{Binding CancelDeletionCommand}"
+                                                Style="{StaticResource SecondaryButton}" />
+                                        <Button Grid.Column="1" Text="Sí, eliminar el curso"
+                                                Command="{Binding ConfirmDeletionCommand}"
+                                                Style="{StaticResource PrimaryButton}"
+                                                BackgroundColor="{StaticResource Danger}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Border>
+
+
+                            <Label Text="{Binding DeleteStatus}" IsVisible="{Binding IsConfirmingDeletion}"
+                                   TextColor="{StaticResource Ink}" FontSize="13" />
+                            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Primary}" />
+                        </VerticalStackLayout>
+
+                        <Border Grid.Column="1" Style="{StaticResource SoftCard}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="16">
+                                <Label Text="Qué significa eliminar" Style="{StaticResource SectionTitle}" />
+                                <Label Text="Eliminar retira el CONTENIDO de esta OPS. No borra el curso del sistema ni nada de lo que hicieron los estudiantes."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="Dos banderas, no una" FontAttributes="Bold" />
+                                <Label Text="presente_local dice si los archivos están en el equipo. disponible_estudiante dice si las tabletas pueden abrirlo. Eliminar apaga las dos y sella la fecha de retiro."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="El progreso vive aparte" FontAttributes="Bold" />
+                                <Label Text="El avance se guarda contra el código de la lección, no contra la fila del contenido. Por eso sobrevive a desinstalar, reinstalar y cambiar de versión."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="Se puede volver a importar" FontAttributes="Bold" />
+                                <Label Text="El mismo paquete se reconoce por su identificador: al reimportarlo no se duplica nada y el progreso reaparece donde estaba."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="Desinstalar contenido no es borrar entidades académicas."
+                                       TextColor="{StaticResource Info}" FontSize="12" FontAttributes="Bold" />
                             </VerticalStackLayout>
                         </Border>
                     </Grid>

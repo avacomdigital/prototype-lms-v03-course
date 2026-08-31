@@ -468,3 +468,246 @@ class QuizAnswer(models.Model):
         db_table = "m10_quiz_respuesta"
         ordering = ["pregunta__orden"]
         constraints = [models.UniqueConstraint(fields=["intento", "pregunta"], name="ux_m10_quiz_respuesta")]
+
+
+class CourseHost(models.Model):
+    """
+    PRESENCIA FÍSICA de un curso en un host. Responde una sola pregunta:
+    ¿este curso está instalado en ESTA OPS en este momento?
+
+    No representa matrícula, ni progreso, ni propiedad del curso. Esas viven en
+    m05_curso_estudiante y cuelgan del CURSO, no del host.
+
+    La regla que justifica esta tabla:
+        DESINSTALAR CONTENIDO  ≠  BORRAR ENTIDADES ACADÉMICAS
+    Al quitar el paquete de una OPS no se borra el curso ni las inscripciones ni
+    las notas: se apagan las banderas de esta fila y se sella retirado_en. El
+    estudiante conserva su historial y ve «no disponible en este dispositivo»
+    en lugar de que el curso desaparezca sin explicación.
+
+    Y por eso NO se toca m05_curso.estado al desinstalar: el estado del curso es
+    editorial —¿está publicado?— mientras que presente_local es material —¿los
+    archivos están en este disco?—. El mismo curso puede estar habilitado y
+    presente en Bogotá y retirado en Medellín.
+    """
+
+    id = models.CharField(primary_key=True, max_length=40, default=new_document_id, editable=False)
+
+    # Identificador del host. Sin FK a propósito: no hay catálogo de hosts en el
+    # prototipo, y añadir la tabla sería inventar una entidad que nadie pidió.
+    host_id = models.CharField(max_length=64)
+
+    curso = models.ForeignKey(Course, related_name="hosts", on_delete=models.PROTECT)
+
+    # Qué versión concreta está instalada aquí. NULL = el curso está registrado
+    # en el host pero todavía no se resolvió su versión.
+    curso_version = models.ForeignKey(
+        CourseVersion,
+        db_column="curso_version_id",
+        related_name="hosts",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+
+    # ── Procedencia del paquete, NEUTRAL al estándar ──────────────────────────
+    # SCORM y CMI5 son formatos de ENTRADA, no modelos distintos de curso: cada
+    # parser transforma su formato al mismo árbol
+    # curso -> sección -> lección -> lesson item.
+    # Por eso aquí no hay columnas scorm_* ni cmi5_*, solo el formato y dónde
+    # está su descriptor.
+    #
+    #   SCORM 2004   formato=scorm_2004  manifest_tipo=imsmanifest  ref=imsmanifest.xml
+    #   CMI5         formato=cmi5        manifest_tipo=cmi5         ref=cmi5.xml
+    #   nativo       formato=avacom_v1   manifest_tipo=avacom       ref=<archivo>.json
+    FORMATO_SCORM_12 = "scorm_12"
+    FORMATO_SCORM_2004 = "scorm_2004"
+    FORMATO_CMI5 = "cmi5"
+    FORMATO_AVACOM_V1 = "avacom_v1"
+    FORMATOS = [
+        (FORMATO_SCORM_12, "SCORM 1.2"),
+        (FORMATO_SCORM_2004, "SCORM 2004"),
+        (FORMATO_CMI5, "cmi5"),
+        # AÑADIDO a la propuesta: es el único formato que el prototipo instala
+        # hoy. Sin él, `formato_contenido NOT NULL` con CHECK restringido a los
+        # tres estándares dejaría fuera el camino que ya funciona.
+        (FORMATO_AVACOM_V1, "AVACOM course package v1"),
+    ]
+
+    formato_contenido = models.CharField(
+        max_length=16, choices=FORMATOS, default=FORMATO_AVACOM_V1
+    )
+
+    # Identificador externo del paquete, tal como lo declara su propio formato:
+    # el `identifier` del manifest en SCORM, el IRI del curso en CMI5, el
+    # `package_id` en el nuestro.
+    package_identifier = models.CharField(max_length=500, null=True, blank=True)
+    # Versión que declara el paquete. Se guarda aquí, y no solo en
+    # m05_curso_version, porque es lo que este host recibió.
+    package_version = models.CharField(max_length=32, null=True, blank=True)
+
+    # Descriptor: qué tipo es y dónde está dentro del paquete.
+    manifest_tipo = models.CharField(max_length=32, null=True, blank=True)
+    manifest_ref = models.CharField(max_length=500, null=True, blank=True)
+
+    # Dónde están los archivos y con qué huella llegaron. El binario pesado vive
+    # fuera de la base, igual que en m05_recurso_aprendizaje.
+    package_ref = models.CharField(max_length=500, null=True, blank=True)
+    package_huella = models.CharField(max_length=64, null=True, blank=True)
+
+    # ── Las dos banderas, que son distintas a propósito ──────────────────────
+    # presente_local        los archivos están en este disco
+    # disponible_estudiante los estudiantes ya pueden usarlo
+    # Recién importado y en validación: presente=1, disponible=0.
+    presente_local = models.BooleanField(default=True)
+    disponible_estudiante = models.BooleanField(default=False)
+
+    instalado_en = models.BigIntegerField(default=now_ms)
+    retirado_en = models.BigIntegerField(null=True, blank=True)
+    verificado_en = models.BigIntegerField(null=True, blank=True)
+    creado_en = models.BigIntegerField(default=now_ms)
+    creado_por = models.CharField(max_length=64, null=True, blank=True)
+    secuencia = models.BigIntegerField(default=sequence_value)
+
+    class Meta:
+        db_table = "m05_curso_host"
+        ordering = ["host_id", "curso_id"]
+        indexes = [
+            models.Index(fields=["host_id", "presente_local"], name="ix_m05_ch_host"),
+            models.Index(fields=["curso", "presente_local"], name="ix_m05_ch_curso"),
+            models.Index(fields=["formato_contenido"], name="ix_m05_ch_formato"),
+        ]
+        constraints = [
+            # Una fila por (host, curso, versión). Ahora sí queda el historial de
+            # QUÉ versión estuvo instalada en este host, que con la clave anterior
+            # —(host, curso)— se perdía al sobrescribir curso_version_id.
+            models.UniqueConstraint(
+                fields=["host_id", "curso", "curso_version"], name="ux_m05_ch_host_curso_version"
+            ),
+
+            # AÑADIDO · tapa el hueco de los NULL. En SQLite y en Postgres, un
+            # UNIQUE trata dos NULL como distintos, así que la clave de arriba
+            # dejaría insertar (host, curso, NULL) tantas veces como se quiera y
+            # se rompería la idempotencia de register_install().
+            models.UniqueConstraint(
+                fields=["host_id", "curso"],
+                condition=Q(curso_version__isnull=True),
+                name="ux_m05_ch_sin_version",
+            ),
+
+            # AÑADIDO · con filas por versión, dos versiones del mismo curso
+            # podrían quedar ofrecidas a la vez en el mismo host, y el estudiante
+            # vería el curso duplicado. Solo una disponible por (host, curso).
+            # Mismo idiom que ux_m05_cv_una_activa.
+            models.UniqueConstraint(
+                fields=["host_id", "curso"],
+                condition=Q(disponible_estudiante=True),
+                name="ux_m05_ch_una_disponible",
+            ),
+
+            # AÑADIDO a la propuesta · no se puede ofrecer a los estudiantes
+            # contenido que no está en el disco. Los ejemplos de la propuesta
+            # siempre respetaban esta regla, pero nada la imponía.
+            models.CheckConstraint(
+                condition=Q(presente_local=True) | Q(disponible_estudiante=False),
+                name="ck_m05_ch_disponible_requiere_presente",
+            ),
+
+            # AÑADIDO · si ya no está presente, se sabe cuándo dejó de estarlo.
+            # Mismo patrón que ck_m05_cv_retirada_con_fecha.
+            models.CheckConstraint(
+                condition=Q(presente_local=True) | Q(retirado_en__isnull=False),
+                name="ck_m05_ch_retirado_con_fecha",
+            ),
+        ]
+
+    # NOTA · la invariante «la versión instalada pertenece a ESTE curso» necesita
+    # una FK compuesta (curso_version_id, curso_id) que el ORM de Django no puede
+    # expresar, igual que en m05_curso.version_activa_id. Se impone en
+    # exams.hosts.register_install() y está cubierta por pruebas.
+
+    @property
+    def estado_legible(self):
+        if not self.presente_local:
+            return "desinstalado"
+        return "disponible" if self.disponible_estudiante else "instalado"
+
+
+class LessonProgress(models.Model):
+    """
+    PROGRESO del estudiante en una lección.
+
+    Se indexa por el CÓDIGO LÓGICO de la lección, no por su fila física.
+    Es la decisión que hace que el progreso sobreviva a lo que exige el spec:
+
+      · desinstalar y reinstalar el mismo paquete  (§13, §21 pasos 5-9)
+      · subir de versión: la V2 tiene filas m05_leccion nuevas, pero la misma
+        lección conceptual conserva su `codigo`, así que el progreso la sigue
+
+    Si se indexara por m05_leccion.id, un cambio de versión dejaría el progreso
+    huérfano. Ese es justamente el problema que `codigo` existe para resolver.
+
+    La nota del quiz NO se duplica aquí: vive en m10_quiz_intento.puntaje, que es
+    su registro autoritativo. El porcentaje de una lección con actividad
+    calificable se deriva de ahí.
+    """
+
+    ESTADO_NO_INICIADA = "no_iniciada"
+    ESTADO_EN_CURSO = "en_curso"
+    ESTADO_COMPLETADA = "completada"
+    ESTADOS = [
+        (ESTADO_NO_INICIADA, "No iniciada"),
+        (ESTADO_EN_CURSO, "En curso"),
+        (ESTADO_COMPLETADA, "Completada"),
+    ]
+
+    id = models.CharField(primary_key=True, max_length=40, default=new_document_id, editable=False)
+    # Cuelga del CURSO, no de la versión: el progreso es del estudiante en el
+    # curso, y sobrevive a que el contenido se reemplace.
+    curso = models.ForeignKey(Course, related_name="progresos", on_delete=models.PROTECT)
+    persona_id = models.CharField(max_length=64)
+    # Identidad LÓGICA de la lección ('lesson.fracciones-equivalentes').
+    leccion_codigo = models.CharField(max_length=120)
+    # Se guarda el título con el que se registró para poder mostrar el historial
+    # aunque el contenido ya no esté instalado (§12: el estudiante ve el nombre).
+    leccion_titulo = models.CharField(max_length=250, blank=True)
+
+    porcentaje = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    estado = models.CharField(max_length=16, choices=ESTADOS, default=ESTADO_NO_INICIADA)
+    iniciado_en = models.BigIntegerField(default=now_ms)
+    actualizado_en = models.BigIntegerField(default=now_ms)
+    completado_en = models.BigIntegerField(null=True, blank=True)
+    creado_en = models.BigIntegerField(default=now_ms)
+    creado_por = models.CharField(max_length=64, null=True, blank=True)
+    secuencia = models.BigIntegerField(default=sequence_value)
+
+    class Meta:
+        db_table = "m05_progreso_leccion"
+        ordering = ["curso_id", "persona_id", "leccion_codigo"]
+        indexes = [
+            models.Index(fields=["persona_id", "curso"], name="ix_m05_prog_persona"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["curso", "persona_id", "leccion_codigo"], name="ux_m05_prog_leccion"
+            ),
+            # El porcentaje es un porcentaje. En el motor, para que ningún cliente
+            # pueda dejar un 340 % en la base.
+            models.CheckConstraint(
+                condition=Q(porcentaje__gte=0) & Q(porcentaje__lte=100),
+                name="ck_m05_prog_porcentaje",
+            ),
+            # Coherencia del ciclo: completada implica 100 y con fecha.
+            models.CheckConstraint(
+                condition=~Q(estado="completada")
+                | (Q(porcentaje=100) & Q(completado_en__isnull=False)),
+                name="ck_m05_prog_completada",
+            ),
+        ]
+
+    @property
+    def porcentaje_entero(self):
+        return int(self.porcentaje)

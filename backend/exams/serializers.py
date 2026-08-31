@@ -4,6 +4,8 @@ from rest_framework import serializers
 
 from .models import (
     Activity,
+    LessonProgress,
+    CourseHost,
     AuditLog,
     Course,
     CourseEnrollment,
@@ -578,3 +580,139 @@ def build_version_package(version):
         "activities": list(actividades.values()),
         "sections": secciones_json,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PRESENCIA FÍSICA EN UN HOST · m05_curso_host
+#
+# Neutral al estándar: SCORM y CMI5 son formatos de ENTRADA, no modelos
+# distintos de curso. Aquí solo se registra qué formato llegó y dónde está su
+# descriptor; el parser correspondiente lo transforma al árbol común de AVACOM.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class CourseHostSerializer(serializers.ModelSerializer):
+    """CRUD directo sobre la fila. Para las transiciones usa los endpoints de acción."""
+
+    curso_titulo = serializers.CharField(source="curso.titulo", read_only=True)
+    curso_estado = serializers.CharField(source="curso.estado", read_only=True)
+    version = serializers.IntegerField(source="curso_version.version", read_only=True, allow_null=True)
+    estado_host = serializers.CharField(source="estado_legible", read_only=True)
+    formato_legible = serializers.CharField(source="get_formato_contenido_display", read_only=True)
+
+    class Meta:
+        model = CourseHost
+        fields = "__all__"
+        read_only_fields = ["id", "creado_en", "secuencia"]
+
+    def validate(self, attrs):
+        def actual(nombre, defecto=None):
+            return attrs.get(nombre, getattr(self.instance, nombre, defecto))
+
+        curso = actual("curso")
+        version = actual("curso_version")
+        presente = actual("presente_local", True)
+        disponible = actual("disponible_estudiante", False)
+        retirado = actual("retirado_en")
+
+        # La invariante de la FK compuesta que el ORM no puede expresar.
+        if version is not None and curso is not None and version.curso_id != curso.pk:
+            raise serializers.ValidationError(
+                f"La versión {version.pk} pertenece al curso {version.curso_id}, no a {curso.pk}."
+            )
+        if disponible and not presente:
+            raise serializers.ValidationError(
+                "No se puede marcar disponible para estudiantes un curso que no está "
+                "presente en el host."
+            )
+        if not presente and retirado is None:
+            raise serializers.ValidationError(
+                "Si el curso ya no está presente, indica retirado_en. Para desinstalar, "
+                "usa POST /api/course-hosts/retire/, que sella la fecha y audita."
+            )
+        # Solo una versión ofrecida por (host, curso): el motor lo impone con
+        # ux_m05_ch_una_disponible, pero un 400 explica mejor que un 500.
+        if disponible and curso is not None:
+            host_id = actual("host_id")
+            otras = CourseHost.objects.filter(
+                host_id=host_id, curso=curso, disponible_estudiante=True
+            )
+            if self.instance is not None:
+                otras = otras.exclude(pk=self.instance.pk)
+            if otras.exists():
+                raise serializers.ValidationError(
+                    "Ya hay otra versión de este curso ofrecida a los estudiantes en "
+                    "este host. Ciérrala primero, o usa "
+                    "POST /api/course-hosts/availability/, que lo hace en el orden correcto."
+                )
+        return attrs
+
+
+class CourseHostInstallSerializer(serializers.Serializer):
+    """
+    Cuerpo de POST /api/course-hosts/install/.
+
+    Ejemplos del bloque de procedencia:
+        SCORM 2004  formato_contenido=scorm_2004  manifest_tipo=imsmanifest
+                    manifest_ref=imsmanifest.xml
+                    package_identifier=AVACOM-MAT-001
+        CMI5        formato_contenido=cmi5        manifest_tipo=cmi5
+                    manifest_ref=cmi5.xml
+                    package_identifier=https://avacom.edu/courses/math-001
+    """
+
+    host_id = serializers.CharField(max_length=64)
+    curso_id = serializers.CharField(max_length=40)
+    curso_version_id = serializers.CharField(max_length=40, required=False, allow_null=True)
+    formato_contenido = serializers.ChoiceField(
+        choices=CourseHost.FORMATOS, required=False, allow_null=True, default=None
+    )
+    package_identifier = serializers.CharField(max_length=500, required=False, allow_null=True)
+    package_version = serializers.CharField(max_length=32, required=False, allow_null=True)
+    manifest_tipo = serializers.CharField(max_length=32, required=False, allow_null=True)
+    manifest_ref = serializers.CharField(max_length=500, required=False, allow_null=True)
+    package_ref = serializers.CharField(max_length=500, required=False, allow_null=True)
+    package_huella = serializers.CharField(max_length=64, required=False, allow_null=True)
+    disponible_estudiante = serializers.BooleanField(required=False, allow_null=True, default=None)
+    actor = serializers.CharField(max_length=64, required=False, default="docente-ops")
+
+
+class CourseHostTargetSerializer(serializers.Serializer):
+    """
+    Identifica la fila y quién actúa.
+
+    curso_version_id es opcional: sin él, retire() quita todas las versiones del
+    curso en ese host, y las demás acciones exigen que haya solo una.
+    """
+
+    host_id = serializers.CharField(max_length=64)
+    curso_id = serializers.CharField(max_length=40)
+    curso_version_id = serializers.CharField(max_length=40, required=False, allow_null=True)
+    actor = serializers.CharField(max_length=64, required=False, default="docente-ops")
+
+
+class CourseHostAvailabilitySerializer(CourseHostTargetSerializer):
+    disponible_estudiante = serializers.BooleanField()
+
+
+class CourseHostVerifySerializer(CourseHostTargetSerializer):
+    package_huella = serializers.CharField(max_length=64, required=False, allow_null=True)
+
+
+class LessonProgressSerializer(serializers.ModelSerializer):
+    """
+    Progreso de una lección. Se indexa por el CÓDIGO lógico, no por la fila
+    física de m05_leccion: así sobrevive a reinstalar y a subir de versión.
+    """
+
+    curso_titulo = serializers.CharField(source="curso.titulo", read_only=True)
+
+    class Meta:
+        model = LessonProgress
+        fields = "__all__"
+        read_only_fields = ["id", "creado_en", "secuencia", "iniciado_en"]
+
+    def validate_porcentaje(self, valor):
+        if valor < 0 or valor > 100:
+            raise serializers.ValidationError("El porcentaje tiene que estar entre 0 y 100.")
+        return valor

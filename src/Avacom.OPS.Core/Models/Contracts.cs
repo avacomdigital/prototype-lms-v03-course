@@ -335,3 +335,219 @@ public sealed record CoursePackageImportOptions(
     string? TeacherId = null,
     string? Actor = null,
     bool? Activate = null);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPORTACIÓN DE UN PAQUETE SCORM / CMI5  (.zip)
+//
+// El backend detecta el formato leyendo el descriptor del .zip —imsmanifest.xml
+// o cmi5.xml—, importa la estructura al mismo árbol de AVACOM y registra la
+// presencia en m05_curso_host. Aquí solo viajan los tipos del cliente: el .zip
+// entra como byte[] y sale un resultado tipado.
+// ═══════════════════════════════════════════════════════════════════════════
+
+public sealed record ZipPackageCounts(
+    [property: JsonPropertyName("secciones")] int Sections,
+    [property: JsonPropertyName("lecciones")] int Lessons,
+    [property: JsonPropertyName("items")] int Items,
+    [property: JsonPropertyName("recursos")] int Resources,
+    [property: JsonPropertyName("actividades")] int Activities)
+{
+    public string Summary => $"{Sections} secciones · {Lessons} lecciones · {Items} ítems";
+    public string ContentSummary => $"{Resources} recursos · {Activities} actividades";
+}
+
+/// <summary>Lo que el backend leyó del .zip, sin escribir nada en la base.</summary>
+public sealed record ZipPackageDetected(
+    [property: JsonPropertyName("package_name")] string PackageName,
+    [property: JsonPropertyName("content_format")] string ContentFormat,
+    [property: JsonPropertyName("manifest_type")] string? ManifestType,
+    [property: JsonPropertyName("manifest_ref")] string? ManifestRef,
+    [property: JsonPropertyName("package_identifier")] string PackageIdentifier,
+    [property: JsonPropertyName("package_version")] string? PackageVersion,
+    [property: JsonPropertyName("package_huella")] string? Fingerprint,
+    [property: JsonPropertyName("detected_title")] string DetectedTitle,
+    [property: JsonPropertyName("course_id")] string CourseId,
+    [property: JsonPropertyName("course_exists")] bool CourseExists,
+    [property: JsonPropertyName("existing_title")] string? ExistingTitle,
+    [property: JsonPropertyName("version")] int Version,
+    [property: JsonPropertyName("counts")] ZipPackageCounts Counts)
+{
+    /// <summary>Cómo se llama el estándar en pantalla.</summary>
+    public string FormatLabel => ContentFormat switch
+    {
+        "scorm_12" => "SCORM 1.2",
+        "scorm_2004" => "SCORM 2004",
+        "cmi5" => "cmi5",
+        "avacom_v1" => "Paquete AVACOM",
+        _ => ContentFormat,
+    };
+
+    public string DescriptorLabel => string.IsNullOrWhiteSpace(ManifestRef)
+        ? "sin descriptor"
+        : $"{ManifestType}: {ManifestRef}";
+
+    /// <summary>Solo hace falta pedir título y marco si el curso todavía no existe.</summary>
+    public bool NeedsCourseDetails => !CourseExists;
+
+    public string SuggestedTitle => ExistingTitle ?? DetectedTitle;
+
+    /// <summary>Qué va a pasar al confirmar, en una frase.</summary>
+    public string Intent => CourseExists
+        ? $"Se añadirá la versión {Version} al curso «{ExistingTitle}» que ya está en la OPS."
+        : $"Se creará el curso y su versión {Version} a partir de este paquete {FormatLabel}.";
+}
+
+/// <summary>Una fila de m05_curso_host: la presencia física del curso en esta OPS.</summary>
+public sealed record CourseHostRow(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("host_id")] string HostId,
+    [property: JsonPropertyName("curso")] string CourseId,
+    [property: JsonPropertyName("curso_titulo")] string? CourseTitle,
+    [property: JsonPropertyName("curso_estado")] string? CourseStatus,
+    [property: JsonPropertyName("version")] int? Version,
+    [property: JsonPropertyName("formato_contenido")] string ContentFormat,
+    [property: JsonPropertyName("formato_legible")] string? FormatLabel,
+    [property: JsonPropertyName("manifest_tipo")] string? ManifestType,
+    [property: JsonPropertyName("manifest_ref")] string? ManifestRef,
+    [property: JsonPropertyName("package_identifier")] string? PackageIdentifier,
+    [property: JsonPropertyName("package_ref")] string? PackageRef,
+    [property: JsonPropertyName("presente_local")] bool PresentLocally,
+    [property: JsonPropertyName("disponible_estudiante")] bool AvailableToStudents,
+    [property: JsonPropertyName("estado_host")] string HostState,
+    [property: JsonPropertyName("instalado_en")] long? InstalledAt,
+    [property: JsonPropertyName("retirado_en")] long? RetiredAt)
+{
+    /// <summary>Las dos banderas son independientes; esto las resume para la UI.</summary>
+    public string StateLabel => HostState switch
+    {
+        "disponible" => "Disponible para estudiantes",
+        "instalado" => "Instalado · sin habilitar",
+        "desinstalado" => "Desinstalado de esta OPS",
+        _ => HostState,
+    };
+
+    public string VersionLabel => Version.HasValue ? $"Versión {Version}" : "Sin versión resuelta";
+
+    public string DescriptorLabel => string.IsNullOrWhiteSpace(ManifestRef)
+        ? "—" : $"{ManifestType}: {ManifestRef}";
+}
+
+/// <summary>Resultado de instalar un .zip: lo detectado, lo escrito y la presencia.</summary>
+public sealed record ZipInstallResult(
+    [property: JsonPropertyName("detected")] ZipPackageDetected Detected,
+    [property: JsonPropertyName("install")] CoursePackageImportResult Install,
+    [property: JsonPropertyName("host")] CourseHostRow Host,
+    [property: JsonPropertyName("message")] string Message)
+{
+    public bool IsAvailableToStudents => Host.PresentLocally && Host.AvailableToStudents;
+
+    public string Headline => Install.Idempotent
+        ? $"«{Install.CourseTitle}» ya tenía la versión {Install.Version} instalada."
+        : Install.CourseCreated
+            ? $"«{Install.CourseTitle}» se creó desde un paquete {Detected.FormatLabel}."
+            : $"«{Install.CourseTitle}» recibió la versión {Install.Version}.";
+}
+
+/// <summary>
+/// Lo que aporta quien importa. El .zip declara su identificador pero no el
+/// título del curso ni su marco curricular: esas son decisiones de la sede.
+/// </summary>
+public sealed record ZipInstallOptions(
+    string HostId,
+    string? Title = null,
+    string? CurriculumFramework = null,
+    string? CourseId = null,
+    int? Version = null,
+    string? Actor = null);
+
+/// <summary>Envoltura de la vista previa: el backend responde {preview, detected}.</summary>
+public sealed record ZipPackagePreviewEnvelope(
+    [property: JsonPropertyName("preview")] bool Preview,
+    [property: JsonPropertyName("detected")] ZipPackageDetected Detected);
+
+/// <summary>
+/// Lo académico que sobrevive a eliminar un curso. La regla del prototipo es que
+/// desinstalar contenido no borra entidades académicas, así que estos tres
+/// números tienen que ser idénticos antes y después.
+/// </summary>
+public sealed record PreservedCounts(
+    [property: JsonPropertyName("students")] int Students,
+    [property: JsonPropertyName("progress_rows")] int ProgressRows,
+    [property: JsonPropertyName("quiz_attempts")] int QuizAttempts)
+{
+    public bool IsEmpty => Students == 0 && ProgressRows == 0 && QuizAttempts == 0;
+
+    /// <summary>Lo que la tarjeta le promete al docente, en sus propios números.</summary>
+    public string Summary => IsEmpty
+        ? "Todavía no hay progreso de estudiantes en este curso."
+        : $"{Students} {(Students == 1 ? "estudiante" : "estudiantes")} · " +
+          $"{ProgressRows} {(ProgressRows == 1 ? "lección con avance" : "lecciones con avance")} · " +
+          $"{QuizAttempts} {(QuizAttempts == 1 ? "intento de quiz" : "intentos de quiz")}";
+}
+
+/// <summary>Una tarjeta de la pantalla «Eliminar curso»: un curso presente en esta OPS.</summary>
+public sealed record InstalledCourseCard(
+    [property: JsonPropertyName("course_id")] string CourseId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("course_state")] string? CourseState,
+    [property: JsonPropertyName("version")] int? Version,
+    [property: JsonPropertyName("content_format")] string ContentFormat,
+    [property: JsonPropertyName("format_label")] string? FormatLabel,
+    [property: JsonPropertyName("package_identifier")] string? PackageIdentifier,
+    [property: JsonPropertyName("manifest_tipo")] string? ManifestType,
+    [property: JsonPropertyName("installed")] bool Installed,
+    [property: JsonPropertyName("available")] bool Available,
+    [property: JsonPropertyName("installed_at")] long? InstalledAt,
+    [property: JsonPropertyName("preserved")] PreservedCounts Preserved)
+{
+    public string StateLabel => Available
+        ? "Disponible para estudiantes"
+        : "Instalado · sin habilitar";
+
+    public string VersionLabel => Version.HasValue
+        ? $"Versión {Version} · {FormatLabel}"
+        : $"Sin versión resuelta · {FormatLabel}";
+
+    /// <summary>Lo que se conservaría, dicho antes de confirmar y no después.</summary>
+    public string PreservedSummary => Preserved.Summary;
+
+    public bool HasStudentWork => !Preserved.IsEmpty;
+}
+
+/// <summary>Envoltura del listado de cursos presentes en una OPS.</summary>
+public sealed record InstalledCoursesEnvelope(
+    [property: JsonPropertyName("host_id")] string HostId,
+    [property: JsonPropertyName("cursos")] int Count,
+    [property: JsonPropertyName("disponibles")] int AvailableCount,
+    [property: JsonPropertyName("courses")] List<InstalledCourseCard> Courses);
+
+/// <summary>El antes y el después de eliminar, para poder afirmar que nada se perdió.</summary>
+public sealed record PreservedProof(
+    [property: JsonPropertyName("before")] PreservedCounts Before,
+    [property: JsonPropertyName("after")] PreservedCounts After,
+    [property: JsonPropertyName("intact")] bool Intact);
+
+/// <summary>
+/// Resultado de eliminar un curso de esta OPS. El contenido se retira; los
+/// estudiantes, el progreso y las calificaciones no se tocan.
+/// </summary>
+public sealed record CourseUninstallResult(
+    [property: JsonPropertyName("course_id")] string CourseId,
+    [property: JsonPropertyName("uninstalled_versions")] int UninstalledVersions,
+    [property: JsonPropertyName("course_state")] string CourseState,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("preserved")] PreservedProof Preserved,
+    [property: JsonPropertyName("hosts")] List<CourseHostRow> Hosts)
+{
+    /// <summary>Ninguna fila sigue presente: el contenido salió de esta OPS.</summary>
+    public bool ContentRemoved => Hosts.All(h => !h.PresentLocally);
+
+    /// <summary>Nadie puede abrirlo: la bandera de disponibilidad quedó apagada.</summary>
+    public bool NoLongerAvailable => Hosts.All(h => !h.AvailableToStudents);
+
+    public string Headline => $"El contenido se retiró de esta OPS.";
+
+    public string PreservedLabel => Preserved.Intact
+        ? $"Se conservó todo: {Preserved.After.Summary}"
+        : "ATENCIÓN: los conteos cambiaron. Algo académico se perdió.";
+}

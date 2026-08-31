@@ -1,4 +1,5 @@
 import os
+import socket
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -55,6 +56,13 @@ DATA_DIR = Path(os.getenv("AVACOM_DATA_DIR") or BASE_DIR)
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": DATA_DIR / "db.sqlite3"}}
 
 CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+
+# Identidad de ESTA OPS. Es la clave con la que m05_curso_host registra qué
+# contenido está presente en este equipo, y con la que el catálogo del estudiante
+# decide qué se puede abrir acá. El OPS Master usa el nombre de la máquina como
+# valor por defecto, así que en una instalación de un solo equipo —que es lo que
+# es una OPS— coinciden sin configurar nada.
+AVACOM_HOST_ID = os.environ.get("AVACOM_HOST_ID") or socket.gethostname() or "OPS-LOCAL"
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],

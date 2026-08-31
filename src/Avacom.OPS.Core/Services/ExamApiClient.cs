@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -20,6 +21,30 @@ public interface ILmsApiClient
     /// <summary>Instala el paquete en el backend y lo deja disponible para las tabletas.</summary>
     Task<CoursePackageImportResult> ImportCoursePackageAsync(
         string packageJson, CoursePackageImportOptions options, CancellationToken cancellationToken = default);
+
+    /// <summary>Lee un .zip SCORM o CMI5 sin escribir nada, para la vista previa.</summary>
+    Task<ZipPackageDetected> InspectZipPackageAsync(
+        byte[] zipContent, string fileName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Instala un .zip SCORM o CMI5: importa la estructura y registra la presencia
+    /// en m05_curso_host.
+    /// </summary>
+    Task<ZipInstallResult> InstallZipPackageAsync(
+        byte[] zipContent, string fileName, ZipInstallOptions options,
+        CancellationToken cancellationToken = default);
+    /// <summary>Los cursos presentes en esta OPS: las tarjetas de «Eliminar curso».</summary>
+    Task<IReadOnlyList<InstalledCourseCard>> GetInstalledCoursesAsync(
+        string hostId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retira el contenido de esta OPS. NO borra el curso ni nada académico: apaga
+    /// las banderas de presencia y sella la fecha de retiro.
+    /// </summary>
+    Task<CourseUninstallResult> UninstallCourseAsync(
+        string courseId, string hostId, string? actor = null,
+        CancellationToken cancellationToken = default);
+
     Task<CourseEnrollment> EnrollStudentAsync(string courseId, string personId, CancellationToken cancellationToken = default);
     Task<QuizAttempt> StartQuizAsync(string activityId, string studentName, string personId, string deviceId, CancellationToken cancellationToken = default);
     Task ReportProgressAsync(string attemptId, int question, CancellationToken cancellationToken = default);
@@ -77,6 +102,61 @@ public sealed class LmsApiClient(HttpClient httpClient) : ILmsApiClient
         var cuerpo = MergeIntoJsonObject(packageJson, extras);
         return PostRawAsync<CoursePackageImportResult>("api/course-packages/import/", cuerpo, cancellationToken);
     }
+
+    public async Task<ZipPackageDetected> InspectZipPackageAsync(
+        byte[] zipContent, string fileName, CancellationToken cancellationToken = default)
+    {
+        // ?preview=1: el backend detecta formato y estructura pero NO escribe.
+        using var contenido = ZipMultipart(zipContent, fileName, null);
+        using var response = await httpClient.PostAsync(
+            "api/course-packages/install/?preview=1", contenido, cancellationToken);
+        var envoltura = await ReadAsync<ZipPackagePreviewEnvelope>(
+            response, Describe(fileName, zipContent.Length), cancellationToken);
+        return envoltura.Detected;
+    }
+
+    public async Task<ZipInstallResult> InstallZipPackageAsync(
+        byte[] zipContent, string fileName, ZipInstallOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        using var contenido = ZipMultipart(zipContent, fileName, options);
+        using var response = await httpClient.PostAsync(
+            "api/course-packages/install/", contenido, cancellationToken);
+        return await ReadAsync<ZipInstallResult>(
+            response, Describe(fileName, zipContent.Length), cancellationToken);
+    }
+
+    /// <summary>
+    /// El .zip viaja como multipart y no en base64: un paquete SCORM real pesa
+    /// megabytes, y base64 le sumaria un tercio sobre la Wi-Fi del aula.
+    /// </summary>
+    private static MultipartFormDataContent ZipMultipart(
+        byte[] zipContent, string fileName, ZipInstallOptions? options)
+    {
+        var formulario = new MultipartFormDataContent();
+        var archivo = new ByteArrayContent(zipContent);
+        archivo.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        formulario.Add(archivo, "package", string.IsNullOrWhiteSpace(fileName) ? "paquete.zip" : fileName);
+
+        if (options is null) return formulario;
+
+        void Campo(string nombre, string? valor)
+        {
+            if (!string.IsNullOrWhiteSpace(valor)) formulario.Add(new StringContent(valor!), nombre);
+        }
+
+        Campo("host_id", options.HostId);
+        Campo("titulo", options.Title?.Trim());
+        Campo("curriculum_framework", options.CurriculumFramework);
+        Campo("course_id", options.CourseId);
+        Campo("actor", options.Actor);
+        if (options.Version.HasValue) Campo("version", options.Version.Value.ToString());
+        return formulario;
+    }
+
+    /// <summary>El diagnostico no necesita el binario, solo de que archivo se trataba.</summary>
+    private static string Describe(string fileName, int bytes) =>
+        $"paquete {fileName} ({bytes:N0} bytes)";
 
     /// <summary>
     /// Añade claves al objeto JSON de nivel superior conservando todo lo demás
@@ -188,6 +268,22 @@ public sealed class LmsApiClient(HttpClient httpClient) : ILmsApiClient
         string.IsNullOrWhiteSpace(value) ? null
         : value.Length <= max ? value.Trim()
         : value.Trim()[..max];
+
+    public async Task<IReadOnlyList<InstalledCourseCard>> GetInstalledCoursesAsync(
+        string hostId, CancellationToken cancellationToken = default)
+    {
+        var sobre = await GetAsync<InstalledCoursesEnvelope>(
+            $"api/hosts/{Uri.EscapeDataString(hostId)}/installed/", cancellationToken);
+        return sobre.Courses ?? [];
+    }
+
+    public Task<CourseUninstallResult> UninstallCourseAsync(
+        string courseId, string hostId, string? actor = null,
+        CancellationToken cancellationToken = default) =>
+        PostAsync<CourseUninstallResult>(
+            $"api/courses/{Uri.EscapeDataString(courseId)}/uninstall/",
+            new { host_id = hostId, actor = actor ?? "docente-ops" },
+            cancellationToken);
 
     public Task<CourseEnrollment> EnrollStudentAsync(string courseId, string personId, CancellationToken cancellationToken = default) =>
         PostAsync<CourseEnrollment>("api/enrollments/", new { curso = courseId, persona_id = personId, estado = "activa", creado_por = "docente-ops" }, cancellationToken);

@@ -16,4 +16,11 @@ public partial class CoursesPage : ContentPage
         base.OnAppearing();
         await _viewModel.InitializeAsync();
     }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        // Sin esto la consulta periódica seguiría corriendo durante el examen.
+        _viewModel.DetenerVigilancia();
+    }
 }

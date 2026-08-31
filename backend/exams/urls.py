@@ -2,12 +2,28 @@ from django.urls import path
 
 from .views import (
     ActivityCollectionView,
+    AvailableCoursesView,
     ActivityDetailView,
     AuditLogCollectionView,
     AuditLogDetailView,
     CourseCollectionView,
     CourseDetailView,
+    CourseHistoryView,
+    CourseHostAvailabilityView,
+    CourseHostCollectionView,
+    CourseHostDetailView,
+    CourseHostFormatsView,
+    CourseHostInstallView,
+    CourseHostRetireView,
+    CourseHostVerifyView,
+    CoursePackageZipInstallView,
     CourseManifestView,
+    CourseUninstallView,
+    HostCourseListView,
+    HostInstalledCoursesView,
+    StudentCourseProgressView,
+    StudentCoursesView,
+    StudentHostCatalogView,
     CoursePackageImportView,
     CoursePackageInspectView,
     CourseRollbackView,
@@ -46,6 +62,16 @@ urlpatterns = [
     path("curriculum-frameworks/", CurriculumFrameworkCollectionView.as_view()),
     path("curriculum-frameworks/<str:pk>/", CurriculumFrameworkDetailView.as_view()),
     path("courses/", CourseCollectionView.as_view(), name="courses"),
+
+    # ── API del spec · §19 ────────────────────────────────────────────────
+    # Rutas con los nombres que pide el spec. No hay DELETE de curso a
+    # proposito: desinstalar contenido no es borrar lo academico.
+    path("courses/available/", AvailableCoursesView.as_view(), name="courses-available"),
+    path("courses/history/", CourseHistoryView.as_view(), name="courses-history"),
+    path("course-packages/install/", CoursePackageZipInstallView.as_view(), name="package-zip-install"),
+    path("courses/<str:course_id>/uninstall/", CourseUninstallView.as_view(), name="course-uninstall"),
+    path("students/<str:student_id>/courses/", StudentCoursesView.as_view(), name="student-courses"),
+    path("students/<str:student_id>/courses/<str:course_id>/progress/", StudentCourseProgressView.as_view(), name="student-course-progress"),
     path("courses/<str:pk>/", CourseDetailView.as_view(), name="course-detail"),
     path("course-versions/", CourseVersionCollectionView.as_view()),
     path("course-versions/<str:pk>/", CourseVersionDetailView.as_view()),
@@ -88,4 +114,19 @@ urlpatterns = [
     # Importar un paquete desde la OPS: primero se inspecciona, luego se confirma.
     path("course-packages/inspect/", CoursePackageInspectView.as_view(), name="package-inspect"),
     path("course-packages/import/", CoursePackageImportView.as_view(), name="package-import"),
+
+    # ── Presencia fisica en un host (m05_curso_host) ─────────────────────
+    # Responde que cursos estan instalados en esta OPS y cuales se quitaron.
+    # Desinstalar apaga banderas y sella fechas: nunca borra el curso ni las
+    # inscripciones ni las notas.
+    path("course-hosts/", CourseHostCollectionView.as_view(), name="course-hosts"),
+    path("course-hosts/formats/", CourseHostFormatsView.as_view(), name="course-host-formats"),
+    path("course-hosts/install/", CourseHostInstallView.as_view(), name="course-host-install"),
+    path("course-hosts/retire/", CourseHostRetireView.as_view(), name="course-host-retire"),
+    path("course-hosts/availability/", CourseHostAvailabilityView.as_view(), name="course-host-availability"),
+    path("course-hosts/verify/", CourseHostVerifyView.as_view(), name="course-host-verify"),
+    path("course-hosts/<str:pk>/", CourseHostDetailView.as_view(), name="course-host-detail"),
+    path("hosts/<str:host_id>/courses/", HostCourseListView.as_view(), name="host-courses"),
+    path("hosts/<str:host_id>/installed/", HostInstalledCoursesView.as_view(), name="host-installed"),
+    path("students/<str:persona_id>/host-catalog/", StudentHostCatalogView.as_view(), name="student-host-catalog"),
 ]

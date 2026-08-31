@@ -40,9 +40,14 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     private string _newDescription = "";
     private CurriculumFramework? _newFrameworkItem;
     private string _importFileName = "";
-    private string _importJson = "";
+    private InstalledCourseCard? _courseToDelete;
+    private CourseUninstallResult? _deleteResult;
+    private string _deleteStatus = "Elige el curso que quieres retirar de esta OPS.";
+    private Services.PackageFile? _importFile;
+    private ZipPackageDetected? _importZipDetected;
+    private ZipInstallResult? _importZipResult;
     private string _importTitle = "";
-    private string _importStatus = "Abre el archivo .json del curso para empezar.";
+    private string _importStatus = "Abre un paquete .zip (SCORM o CMI5) o un .json de AVACOM.";
     private CurriculumFramework? _importFramework;
     private CoursePackagePreview? _importPreview;
     private CoursePackageImportResult? _importResult;
@@ -75,10 +80,30 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         CloseDetailCommand = new Command(() => SelectedDetail = null);
         AddSectionCommand = new Command(() => AddSection());
         ShowImportCommand = new Command(() => CurrentView = "import");
+        ShowDeleteCommand = new Command(async () =>
+        {
+            CurrentView = "delete";
+            // Llegar a la pantalla la deja limpia: el resultado de un borrado
+            // anterior es un aviso puntual, no un estado donde quedarse.
+            DeleteResult = null;
+            CourseToDelete = null;
+            await LoadInstalledAsync();
+        });
+        // Elegir una tarjeta NO elimina: abre la confirmación. El paso destructivo
+        // siempre pide un segundo clic.
+        SelectForDeletionCommand = new Command<InstalledCourseCard>(tarjeta =>
+        {
+            DeleteResult = null;
+            CourseToDelete = tarjeta;
+        });
+        CancelDeletionCommand = new Command(() => CourseToDelete = null);
+        ConfirmDeletionCommand = new Command(
+            async () => await DeleteCourseAsync(),
+            () => !IsBusy && CourseToDelete is not null);
         PickPackageCommand = new Command(async () => await PickPackageAsync(), () => !IsBusy);
         ImportPackageCommand = new Command(
             async () => await ImportPackageAsync(),
-            () => !IsBusy && ImportPreview?.CanImport == true);
+            () => !IsBusy && (ImportPreview?.CanImport == true || ImportZipDetected is not null));
         ClearImportCommand = new Command(ClearImport);
         NextWizardCommand = new Command(NextWizard);
         PreviousWizardCommand = new Command(() => WizardStep = Math.Max(1, WizardStep - 1));
@@ -120,6 +145,10 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     public Command PickPackageCommand { get; }
     public Command ImportPackageCommand { get; }
     public Command ClearImportCommand { get; }
+    public Command ShowDeleteCommand { get; }
+    public Command<InstalledCourseCard> SelectForDeletionCommand { get; }
+    public Command CancelDeletionCommand { get; }
+    public Command ConfirmDeletionCommand { get; }
     public Command NextWizardCommand { get; }
     public Command PreviousWizardCommand { get; }
     public Command CreateCourseCommand { get; }
@@ -138,6 +167,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
             Notify(nameof(IsOverview));
             Notify(nameof(IsCreate));
             Notify(nameof(IsImport));
+            Notify(nameof(IsDelete));
             Notify(nameof(IsStudents));
             Notify(nameof(IsResults));
             Notify(nameof(PageTitle));
@@ -148,12 +178,14 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     public bool IsOverview => CurrentView == "overview";
     public bool IsCreate => CurrentView == "create";
     public bool IsImport => CurrentView == "import";
+    public bool IsDelete => CurrentView == "delete";
     public bool IsStudents => CurrentView == "students";
     public bool IsResults => CurrentView == "results";
     public string PageTitle => CurrentView switch
     {
         "create" => "Crear un curso",
         "import" => "Importar un curso",
+        "delete" => "Eliminar un curso",
         "students" => "Asignar estudiantes",
         "results" => "Actividad en vivo",
         _ => "Panel del curso",
@@ -161,7 +193,8 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     public string PageSubtitle => CurrentView switch
     {
         "create" => "Construye la estructura esencial en tres pasos claros.",
-        "import" => "Abre un paquete .json y déjalo disponible para las tabletas.",
+        "import" => "Abre un .zip SCORM o CMI5 y déjalo disponible en esta OPS.",
+        "delete" => "Retira el contenido de esta OPS. El progreso de los estudiantes se conserva.",
         "students" => "Vincula estudiantes al curso seleccionado.",
         "results" => "Sigue la pregunta actual y el consolidado de notas.",
         _ => "Una vista sintetizada de lo que verá el estudiante.",
@@ -203,7 +236,24 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     }
 
     public int ConnectedStudents { get => _connectedStudents; private set => Set(ref _connectedStudents, value); }
-    public bool IsBusy { get => _isBusy; private set { Set(ref _isBusy, value); RefreshCommand.ChangeCanExecute(); CreateCourseCommand.ChangeCanExecute(); AssignStudentCommand.ChangeCanExecute(); } }
+    public bool IsBusy { get => _isBusy; private set { Set(ref _isBusy, value); RefrescarComandosOcupados(); } }
+
+    /// <summary>
+    /// Todo comando cuyo CanExecute lee IsBusy tiene que reevaluarse cuando IsBusy
+    /// cambia; si falta uno, su botón queda apagado para siempre. Pasaba con los dos
+    /// de la pantalla Importar: se ponen en marcha con IsBusy ya en true, así que la
+    /// única oportunidad de volver a habilitarse es esta. Al agregar un comando
+    /// nuevo con `() => !IsBusy`, agrégalo también acá.
+    /// </summary>
+    private void RefrescarComandosOcupados()
+    {
+        RefreshCommand.ChangeCanExecute();
+        PickPackageCommand.ChangeCanExecute();
+        ImportPackageCommand.ChangeCanExecute();
+        ConfirmDeletionCommand.ChangeCanExecute();
+        CreateCourseCommand.ChangeCanExecute();
+        AssignStudentCommand.ChangeCanExecute();
+    }
     public string ConnectionStatus { get => _connectionStatus; private set => Set(ref _connectionStatus, value); }
     public bool IsApiOnline { get => _isApiOnline; private set => Set(ref _isApiOnline, value); }
     public bool IsApiOffline { get => _isApiOffline; private set => Set(ref _isApiOffline, value); }
@@ -273,14 +323,123 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
             Set(ref _importPreview, value);
             Notify(nameof(HasImportPreview));
             Notify(nameof(ImportNeedsDetails));
+            Notify(nameof(ImportSummary));
+            Notify(nameof(ImportContentSummary));
+            Notify(nameof(ImportIntent));
             ImportPackageCommand.ChangeCanExecute();
         }
     }
 
-    public bool HasImportPreview => ImportPreview is not null;
+    /// <summary>
+    /// Lo que el backend leyó de un .zip SCORM o CMI5. El ESTÁNDAR concreto lo
+    /// detecta él, leyendo imsmanifest.xml o cmi5.xml: la extensión del archivo no
+    /// alcanza para saberlo.
+    /// </summary>
+    public ZipPackageDetected? ImportZipDetected
+    {
+        get => _importZipDetected;
+        private set
+        {
+            Set(ref _importZipDetected, value);
+            Notify(nameof(HasImportPreview));
+            Notify(nameof(HasZipDetected));
+            Notify(nameof(ImportNeedsDetails));
+            Notify(nameof(ImportSummary));
+            Notify(nameof(ImportContentSummary));
+            Notify(nameof(ImportIntent));
+            ImportPackageCommand.ChangeCanExecute();
+        }
+    }
 
-    /// <summary>El paquete trae su course_id pero no el título ni el marco: eso lo aporta el docente.</summary>
-    public bool ImportNeedsDetails => ImportPreview?.NeedsCourseDetails == true;
+    public bool HasZipDetected => ImportZipDetected is not null;
+
+    /// <summary>La fila de m05_curso_host que quedó tras instalar el .zip.</summary>
+    public ZipInstallResult? ImportZipResult
+    {
+        get => _importZipResult;
+        private set
+        {
+            Set(ref _importZipResult, value);
+            Notify(nameof(HasImportResult));
+            Notify(nameof(ImportHostRow));
+            Notify(nameof(HasImportHostRow));
+        }
+    }
+
+    /// <summary>Presencia física registrada: es lo que responde «¿está en esta OPS?».</summary>
+    public CourseHostRow? ImportHostRow => ImportZipResult?.Host;
+    public bool HasImportHostRow => ImportHostRow is not null;
+
+    /// <summary>Identidad de esta OPS, con la que se registra la presencia.</summary>
+    public string HostId
+    {
+        get => _endpoint.HostId;
+        set { _endpoint.HostId = value; Notify(); }
+    }
+
+    /// <summary>Los cursos presentes en esta OPS. Una tarjeta por curso.</summary>
+    public ObservableCollection<InstalledCourseCard> InstalledCourses { get; } = [];
+
+    public bool HasInstalledCourses => InstalledCourses.Count > 0;
+    public bool HasNoInstalledCourses => InstalledCourses.Count == 0;
+
+    /// <summary>
+    /// La tarjeta que el docente eligió. Mientras no sea null, la pantalla muestra
+    /// la confirmación en lugar de la lista: no se puede eliminar por accidente.
+    /// </summary>
+    public InstalledCourseCard? CourseToDelete
+    {
+        get => _courseToDelete;
+        private set
+        {
+            Set(ref _courseToDelete, value);
+            Notify(nameof(IsConfirmingDeletion));
+            Notify(nameof(IsPickingDeletion));
+            ConfirmDeletionCommand.ChangeCanExecute();
+        }
+    }
+
+    public bool IsConfirmingDeletion => CourseToDelete is not null;
+
+    /// <summary>
+    /// La lista y la confirmación se excluyen: una pregunta a la vez. Pero el
+    /// RESULTADO no la oculta — antes sí, y como nada limpiaba DeleteResult la
+    /// pantalla quedaba atrapada en la tarjeta del último borrado: el curso
+    /// desaparecía de la vista aunque siguiera instalado.
+    /// </summary>
+    public bool IsPickingDeletion => CourseToDelete is null;
+
+    /// <summary>Lo que quedó tras retirar el contenido, con la prueba de lo conservado.</summary>
+    public CourseUninstallResult? DeleteResult
+    {
+        get => _deleteResult;
+        private set
+        {
+            Set(ref _deleteResult, value);
+            Notify(nameof(HasDeleteResult));
+        }
+    }
+
+    public bool HasDeleteResult => DeleteResult is not null;
+
+    public string DeleteStatus { get => _deleteStatus; private set => Set(ref _deleteStatus, value); }
+
+    public bool HasImportPreview => ImportPreview is not null || ImportZipDetected is not null;
+
+    /// <summary>El paquete trae su identificador pero no el título ni el marco: eso lo aporta el docente.</summary>
+    public bool ImportNeedsDetails =>
+        ImportPreview?.NeedsCourseDetails == true || ImportZipDetected?.NeedsCourseDetails == true;
+
+    // Los tres resúmenes se resuelven contra el paquete que haya, sea .zip o .json,
+    // para que el XAML no tenga que ramificar.
+    public string ImportSummary =>
+        ImportZipDetected?.Counts.Summary ?? ImportPreview?.Summary ?? "";
+
+    public string ImportContentSummary =>
+        ImportZipDetected?.Counts.ContentSummary ?? ImportPreview?.ContentSummary ?? "";
+
+    public string ImportIntent =>
+        ImportZipDetected?.Intent ?? ImportPreview?.Intent ?? "";
 
     public string ImportTitle { get => _importTitle; set => Set(ref _importTitle, value); }
 
@@ -296,7 +455,14 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         private set { Set(ref _importResult, value); Notify(nameof(HasImportResult)); }
     }
 
-    public bool HasImportResult => ImportResult is not null;
+    public bool HasImportResult => ImportResult is not null || ImportZipResult is not null;
+
+    /// <summary>Titular del resultado, venga de un .zip o del formato nativo.</summary>
+    public string ImportHeadline =>
+        ImportZipResult?.Headline ?? ImportResult?.Headline ?? "";
+
+    public string ImportDetail =>
+        ImportZipResult?.Install.Detail ?? ImportResult?.Detail ?? "";
 
     public string ImportStatus { get => _importStatus; private set => Set(ref _importStatus, value); }
 
@@ -647,27 +813,41 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
             var archivo = await _packageFiles.PickAsync();
             if (archivo is null) return;
 
-            ImportResult = null;
-            ImportFileName = archivo.Name;
-            _importJson = archivo.Json;
+            LimpiarPrevias();
+            _importFile = archivo;
+            ImportFileName = $"{archivo.Name}  ·  {archivo.SizeLabel}";
             ImportStatus = "Leyendo el paquete…";
             IsBusy = true;
 
-            var preview = await _api.InspectCoursePackageAsync(_importJson);
-            ImportPreview = preview;
-            ImportTitle = preview.SuggestedTitle;
+            if (archivo.Kind == Services.PackageKind.Zip)
+            {
+                // El backend abre el .zip, busca su descriptor y decide si es
+                // SCORM 1.2, SCORM 2004 o CMI5. Nada se escribe todavía.
+                var detectado = await _api.InspectZipPackageAsync(archivo.Content, archivo.Name);
+                ImportZipDetected = detectado;
+                ImportTitle = detectado.SuggestedTitle;
+                ImportStatus =
+                    $"Detectado {detectado.FormatLabel} · {detectado.DescriptorLabel}. {detectado.Intent}";
+            }
+            else
+            {
+                var preview = await _api.InspectCoursePackageAsync(archivo.AsJson());
+                ImportPreview = preview;
+                ImportTitle = preview.SuggestedTitle;
+                ImportStatus = preview.Intent;
+            }
+
             ImportFramework ??= Frameworks.FirstOrDefault();
-            ImportStatus = preview.Intent;
         }
         catch (LmsApiException exception)
         {
-            ImportPreview = null;
-            ImportStatus = $"El archivo no se pudo leer: {exception.ResponseBody}";
+            LimpiarPrevias();
+            ImportStatus = $"El archivo no se pudo leer: {ExtractDetail(exception.ResponseBody)}";
             await _log.WriteAsync("import", "inspect_failed", exception);
         }
         catch (Exception exception)
         {
-            ImportPreview = null;
+            LimpiarPrevias();
             ImportStatus = $"No se pudo abrir el archivo: {exception.Message}";
             await _log.WriteAsync("import", "pick_failed", exception);
         }
@@ -675,14 +855,16 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     }
 
     /// <summary>
-    /// Paso 2 · confirmar. Django instala en una transacción; si algo falla, la
-    /// base queda como estaba y aquí se muestra el motivo.
+    /// Paso 2 · confirmar. Django instala en una transacción y registra la
+    /// presencia en m05_curso_host; si algo falla, la base queda como estaba y
+    /// aquí se muestra el motivo.
     /// </summary>
     private async Task ImportPackageAsync()
     {
-        if (ImportPreview is null || string.IsNullOrEmpty(_importJson)) return;
+        if (_importFile is null) return;
+        if (ImportPreview is null && ImportZipDetected is null) return;
 
-        if (ImportPreview.NeedsCourseDetails && string.IsNullOrWhiteSpace(ImportTitle))
+        if (ImportNeedsDetails && string.IsNullOrWhiteSpace(ImportTitle))
         {
             ImportStatus = "Ponle un nombre al curso antes de importarlo.";
             return;
@@ -692,21 +874,44 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         ImportStatus = "Importando…";
         try
         {
-            var opciones = new CoursePackageImportOptions(
-                Title: ImportPreview.NeedsCourseDetails ? ImportTitle : null,
-                CurriculumFramework: ImportPreview.NeedsCourseDetails ? ImportFramework?.Key : null,
-                TeacherId: "docente-ops",
-                Actor: "docente-ops");
+            string cursoId;
+            if (_importFile.Kind == Services.PackageKind.Zip)
+            {
+                var opciones = new ZipInstallOptions(
+                    HostId: HostId,
+                    Title: ImportNeedsDetails ? ImportTitle : null,
+                    CurriculumFramework: ImportNeedsDetails ? ImportFramework?.Key : null,
+                    Actor: "docente-ops");
 
-            var resultado = await _api.ImportCoursePackageAsync(_importJson, opciones);
-            ImportResult = resultado;
-            ImportStatus = resultado.IsAvailableToStudents
-                ? $"{resultado.Headline} Ya está disponible en las tabletas."
-                : $"{resultado.Headline} Todavía no está publicada.";
+                var resultado = await _api.InstallZipPackageAsync(
+                    _importFile.Content, _importFile.Name, opciones);
+                ImportZipResult = resultado;
+                cursoId = resultado.Install.CourseId;
+                SoltarPaquete();
+                ImportStatus = resultado.IsAvailableToStudents
+                    ? $"{resultado.Headline} Ya está disponible en las tabletas de {HostId}."
+                    : $"{resultado.Headline} Instalado en {HostId}, sin habilitar todavía.";
+            }
+            else
+            {
+                var opciones = new CoursePackageImportOptions(
+                    Title: ImportNeedsDetails ? ImportTitle : null,
+                    CurriculumFramework: ImportNeedsDetails ? ImportFramework?.Key : null,
+                    TeacherId: "docente-ops",
+                    Actor: "docente-ops");
+
+                var resultado = await _api.ImportCoursePackageAsync(_importFile.AsJson(), opciones);
+                ImportResult = resultado;
+                cursoId = resultado.CourseId;
+                SoltarPaquete();
+                ImportStatus = resultado.IsAvailableToStudents
+                    ? $"{resultado.Headline} Ya está disponible en las tabletas."
+                    : $"{resultado.Headline} Todavía no está publicada.";
+            }
 
             // El catálogo del panel se recarga para que el curso aparezca en Resumen.
             await LoadAsync(force: true);
-            SelectedCourse = Courses.FirstOrDefault(c => c.Id == resultado.CourseId) ?? SelectedCourse;
+            SelectedCourse = Courses.FirstOrDefault(c => c.Id == cursoId) ?? SelectedCourse;
         }
         catch (LmsApiException exception)
         {
@@ -721,14 +926,103 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         finally { IsBusy = false; }
     }
 
+    /// <summary>Trae las tarjetas de lo que hay presente en esta OPS.</summary>
+    private async Task LoadInstalledAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            var cursos = await _api.GetInstalledCoursesAsync(HostId);
+            InstalledCourses.Clear();
+            foreach (var curso in cursos) InstalledCourses.Add(curso);
+
+            Notify(nameof(HasInstalledCourses));
+            Notify(nameof(HasNoInstalledCourses));
+            DeleteStatus = cursos.Count == 0
+                ? $"No hay cursos instalados en {HostId}. Importa uno primero."
+                : $"{cursos.Count} {(cursos.Count == 1 ? "curso instalado" : "cursos instalados")} en {HostId}.";
+        }
+        catch (LmsApiException exception)
+        {
+            DeleteStatus = $"No se pudo leer lo instalado: {ExtractDetail(exception.ResponseBody)}";
+            await _log.WriteAsync("delete", "list_failed", exception);
+        }
+        catch (Exception exception)
+        {
+            DeleteStatus = $"No se pudo leer lo instalado: {exception.Message}";
+            await _log.WriteAsync("delete", "list_failed", exception);
+        }
+        finally { IsBusy = false; }
+    }
+
+    /// <summary>
+    /// Retira el contenido. El backend apaga las dos banderas y sella retirado_en;
+    /// los estudiantes, el progreso y las calificaciones quedan donde estaban, y
+    /// responde el antes y el después para poder afirmarlo y no solo prometerlo.
+    /// </summary>
+    private async Task DeleteCourseAsync()
+    {
+        var tarjeta = CourseToDelete;
+        if (tarjeta is null) return;
+
+        IsBusy = true;
+        DeleteStatus = $"Retirando «{tarjeta.Name}» de {HostId}…";
+        try
+        {
+            var resultado = await _api.UninstallCourseAsync(tarjeta.CourseId, HostId, "docente-ops");
+            DeleteResult = resultado;
+            CourseToDelete = null;
+
+            DeleteStatus = resultado.Preserved.Intact
+                ? $"«{tarjeta.Name}» salió de esta OPS. {resultado.PreservedLabel}"
+                : $"«{tarjeta.Name}» salió de esta OPS, pero los conteos cambiaron: revísalo.";
+
+            // La tarjeta desaparece de la lista y el catálogo del panel se recarga,
+            // porque el curso ya no debe ofrecerse a las tabletas.
+            await LoadInstalledAsync();
+            await LoadAsync(force: true);
+        }
+        catch (LmsApiException exception)
+        {
+            DeleteStatus = $"No se retiró: {ExtractDetail(exception.ResponseBody)}";
+            await _log.WriteAsync("delete", "uninstall_failed", exception);
+        }
+        catch (Exception exception)
+        {
+            DeleteStatus = $"No se retiró: {exception.Message}";
+            await _log.WriteAsync("delete", "uninstall_failed", exception);
+        }
+        finally { IsBusy = false; }
+    }
+
+    /// <summary>
+    /// Tras importar se suelta el archivo y se apaga el botón de confirmar. Si el
+    /// paquete quedara cargado, un clic distraído volvería a instalar un curso que
+    /// quizá se acaba de eliminar. El resultado sí queda a la vista.
+    /// </summary>
+    private void SoltarPaquete()
+    {
+        _importFile = null;
+        ImportZipDetected = null;
+        ImportPreview = null;
+        ImportFileName = "";
+    }
+
+    private void LimpiarPrevias()
+    {
+        ImportPreview = null;
+        ImportZipDetected = null;
+        ImportResult = null;
+        ImportZipResult = null;
+    }
+
     private void ClearImport()
     {
         ImportFileName = "";
-        _importJson = "";
-        ImportPreview = null;
-        ImportResult = null;
+        _importFile = null;
+        LimpiarPrevias();
         ImportTitle = "";
-        ImportStatus = "Abre el archivo .json del curso para empezar.";
+        ImportStatus = "Abre un paquete .zip (SCORM o CMI5) o un .json de AVACOM.";
     }
 
     /// <summary>
