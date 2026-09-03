@@ -524,6 +524,7 @@ class CourseHost(models.Model):
     FORMATO_SCORM_2004 = "scorm_2004"
     FORMATO_CMI5 = "cmi5"
     FORMATO_AVACOM_V1 = "avacom_v1"
+    FORMATO_AVACOM_CONTENIDO = "avacom_contenido"
     FORMATOS = [
         (FORMATO_SCORM_12, "SCORM 1.2"),
         (FORMATO_SCORM_2004, "SCORM 2004"),
@@ -532,10 +533,15 @@ class CourseHost(models.Model):
         # hoy. Sin él, `formato_contenido NOT NULL` con CHECK restringido a los
         # tres estándares dejaría fuera el camino que ya funciona.
         (FORMATO_AVACOM_V1, "AVACOM course package v1"),
+        # El formato del componente de contenido: carpeta con formato.json,
+        # manifiesto.db y medios. NO es el mismo que avacom_v1, que es nuestro
+        # .json de intercambio; se distinguen porque esta columna existe
+        # justamente para decir qué es el contenido que hay en el equipo.
+        (FORMATO_AVACOM_CONTENIDO, "AVACOM-Contenido"),
     ]
 
     formato_contenido = models.CharField(
-        max_length=16, choices=FORMATOS, default=FORMATO_AVACOM_V1
+        max_length=32, choices=FORMATOS, default=FORMATO_AVACOM_V1
     )
 
     # Identificador externo del paquete, tal como lo declara su propio formato:
@@ -711,3 +717,192 @@ class LessonProgress(models.Model):
     @property
     def porcentaje_entero(self):
         return int(self.porcentaje)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Integración con AVACOM-Contenido
+#
+# El componente de contenido es OTRO producto y otra base. Vive en el mismo
+# equipo maestro y solo habla por 127.0.0.1 con este backend.
+#
+# La regla que gobierna estas tres tablas —artículo 8 de su constitución— es que
+# el LMS NO guarda un catálogo propio. Guarda REFERENCIAS: `elemento_ref` y
+# `version_elemento`, que son estables, y nada más. En particular no guarda el
+# título, y esa ausencia es deliberada: un título copiado aquí empieza a mentir
+# en cuanto el paquete se actualice, y el LMS pasa a ser un segundo catálogo que
+# alguien tiene que sincronizar a mano.
+#
+# La consecuencia buscada es la que pedía el prototipo desde el principio:
+# desinstalar un paquete en el componente NO toca nada de esto. La referencia
+# sigue ahí, el examen sigue ahí, la nota sigue ahí; lo único que cambia es que
+# el material deja de poder abrirse hasta que se reinstale.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class UnidadMaterial(models.Model):
+    """
+    Qué material del componente cuelga de qué lección.
+
+    Es el puente entre el curso —que es del LMS— y el catálogo —que es del
+    componente—. Una lección puede tener a la vez ítems propios del LMS
+    (m05_leccion_item, contenido que el LMS sí posee) y material referenciado
+    aquí. No son lo mismo y por eso no comparten tabla: uno se copia, el otro se
+    apunta.
+    """
+
+    id = models.CharField(primary_key=True, max_length=40, default=new_document_id, editable=False)
+    leccion = models.ForeignKey(Lesson, related_name="materiales", on_delete=models.PROTECT)
+
+    # Las tres referencias estables del contrato. Son las ÚNICAS que se guardan.
+    elemento_ref = models.CharField(max_length=200)
+    version_elemento = models.CharField(max_length=32)
+    taxonomia_ref = models.CharField(max_length=200, null=True, blank=True)
+
+    # El tipo se guarda solo para poder ordenar y filtrar sin ir al componente en
+    # cada pantalla. Es un dato del paquete, no una decisión del LMS, y por eso
+    # NO lleva choices: el manifiesto admite diez tipos y mañana admitirá once.
+    # Un switch exhaustivo sobre esta columna se rompe el día que llegue `banco`.
+    tipo = models.CharField(max_length=32, null=True, blank=True)
+
+    orden = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    creado_en = models.BigIntegerField(default=now_ms)
+    creado_por = models.CharField(max_length=64, null=True, blank=True)
+    secuencia = models.BigIntegerField(default=sequence_value)
+
+    class Meta:
+        db_table = "m05_unidad_material"
+        ordering = ["leccion_id", "orden"]
+        constraints = [
+            # El mismo material no se cuelga dos veces de la misma lección. La
+            # VERSIÓN entra en la clave: una lección puede referenciar dos
+            # versiones del mismo elemento durante una transición.
+            models.UniqueConstraint(
+                fields=["leccion", "elemento_ref", "version_elemento"],
+                name="ux_m05_um_leccion_elemento",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["elemento_ref"], name="ix_m05_um_elemento"),
+            models.Index(fields=["taxonomia_ref"], name="ix_m05_um_taxonomia"),
+        ]
+
+    def __str__(self):
+        return f"{self.leccion_id} · {self.elemento_ref}@{self.version_elemento}"
+
+
+class ExamenPregunta(models.Model):
+    """
+    Qué preguntas le tocaron a qué persona, y en qué orden.
+
+    Hace falta porque un banco reparte preguntas distintas a cada alumno: sin
+    esta tabla no se puede reconstruir qué se le preguntó a quién, ni volver a
+    mostrar el mismo examen tras un corte.
+
+    NO hay columna para la clave de respuesta, y no es un olvido. La clave vive
+    en el manifiesto cifrado del componente y se compara allí; traerla aquí la
+    pondría en una consulta, de ahí en un registro y de ahí en un correo.
+    """
+
+    id = models.CharField(primary_key=True, max_length=40, default=new_document_id, editable=False)
+    # El examen del LMS es una actividad: es lo que ya lleva intentos y notas.
+    actividad = models.ForeignKey(
+        Activity, related_name="preguntas_referenciadas", on_delete=models.PROTECT
+    )
+    persona_id = models.CharField(max_length=64)
+
+    pregunta_ref = models.CharField(max_length=200)
+    # De qué evaluación o banco salió. Se guarda para poder explicar el examen
+    # aunque el paquete ya no esté instalado.
+    elemento_ref = models.CharField(max_length=200)
+    version_elemento = models.CharField(max_length=32, null=True, blank=True)
+    orden = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+
+    creado_en = models.BigIntegerField(default=now_ms)
+    creado_por = models.CharField(max_length=64, null=True, blank=True)
+    secuencia = models.BigIntegerField(default=sequence_value)
+
+    class Meta:
+        db_table = "m05_examen_pregunta"
+        ordering = ["actividad_id", "persona_id", "orden"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["actividad", "persona_id", "pregunta_ref"],
+                name="ux_m05_ep_actividad_persona_pregunta",
+            ),
+            models.UniqueConstraint(
+                fields=["actividad", "persona_id", "orden"],
+                name="ux_m05_ep_actividad_persona_orden",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["persona_id"], name="ix_m05_ep_persona"),
+            models.Index(fields=["elemento_ref"], name="ix_m05_ep_elemento"),
+        ]
+
+    def __str__(self):
+        return f"{self.persona_id} · {self.pregunta_ref}"
+
+
+class RepartoActivo(models.Model):
+    """
+    Qué material está repartido a la clase ahora mismo.
+
+    Es lo que decide qué puede abrir una tableta en este momento, y es
+    deliberadamente efímero: se abre al proyectarlo y se cierra al retirarlo. No
+    es catálogo ni es planificación; es el estado de la clase en curso.
+
+    Se conserva cerrado en vez de borrarse para poder explicar después qué se
+    mostró en una clase, que es la misma razón por la que el componente conserva
+    m04_referencia_usada.
+    """
+
+    id = models.CharField(primary_key=True, max_length=40, default=new_document_id, editable=False)
+    host_id = models.CharField(max_length=64)
+    sesion_clase_id = models.CharField(max_length=64)
+    # El curso da el contexto académico; el material, el contenido. Un reparto
+    # sin curso es posible —proyectar algo suelto— y por eso admite nulo.
+    curso = models.ForeignKey(
+        Course, related_name="repartos", on_delete=models.PROTECT, null=True, blank=True
+    )
+    grupo_id = models.CharField(max_length=64, null=True, blank=True)
+
+    elemento_ref = models.CharField(max_length=200)
+    version_elemento = models.CharField(max_length=32, null=True, blank=True)
+    tipo = models.CharField(max_length=32, null=True, blank=True)
+
+    abierto_en = models.BigIntegerField(default=now_ms)
+    cerrado_en = models.BigIntegerField(null=True, blank=True)
+    abierto_por = models.CharField(max_length=64, null=True, blank=True)
+
+    creado_en = models.BigIntegerField(default=now_ms)
+    creado_por = models.CharField(max_length=64, null=True, blank=True)
+    secuencia = models.BigIntegerField(default=sequence_value)
+
+    class Meta:
+        db_table = "m05_reparto_activo"
+        ordering = ["-abierto_en"]
+        constraints = [
+            # Un material no se reparte dos veces a la vez en el mismo equipo. El
+            # índice es parcial: al cerrarlo, se puede volver a repartir.
+            models.UniqueConstraint(
+                fields=["host_id", "sesion_clase_id", "elemento_ref"],
+                condition=models.Q(cerrado_en__isnull=True),
+                name="ux_m05_ra_abierto",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(cerrado_en__isnull=True) | models.Q(cerrado_en__gte=models.F("abierto_en")),
+                name="ck_m05_ra_cierre_posterior",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["host_id", "cerrado_en"], name="ix_m05_ra_host"),
+            models.Index(fields=["elemento_ref"], name="ix_m05_ra_elemento"),
+        ]
+
+    @property
+    def esta_abierto(self):
+        return self.cerrado_en is None
+
+    def __str__(self):
+        estado = "abierto" if self.esta_abierto else "cerrado"
+        return f"{self.elemento_ref} · {estado}"
+

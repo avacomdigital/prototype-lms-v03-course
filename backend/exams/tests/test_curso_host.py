@@ -425,7 +425,10 @@ class ApiTests(TestCase):
         r = self.client.get(reverse("course-host-formats"))
         self.assertEqual(r.status_code, 200)
         claves = {f["clave"] for f in r.json()}
-        self.assertEqual(claves, {"scorm_12", "scorm_2004", "cmi5", "avacom_v1"})
+        self.assertEqual(
+            claves,
+            {"scorm_12", "scorm_2004", "cmi5", "avacom_v1", "avacom_contenido"},
+        )
         cmi5 = next(f for f in r.json() if f["clave"] == "cmi5")
         self.assertEqual(cmi5["manifest_ref_habitual"], "cmi5.xml")
 

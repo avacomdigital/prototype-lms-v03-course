@@ -378,7 +378,8 @@ public sealed record ZipPackageDetected(
         "scorm_12" => "SCORM 1.2",
         "scorm_2004" => "SCORM 2004",
         "cmi5" => "cmi5",
-        "avacom_v1" => "Paquete AVACOM",
+        "avacom_contenido" => "AVACOM-Contenido",
+        "avacom_v1" => "Paquete AVACOM (.json)",
         _ => ContentFormat,
     };
 
@@ -551,3 +552,201 @@ public sealed record CourseUninstallResult(
         ? $"Se conservó todo: {Preserved.After.Summary}"
         : "ATENCIÓN: los conteos cambiaron. Algo académico se perdió.";
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Integración con AVACOM-Contenido
+//
+// El componente de contenido es otro producto que corre en el mismo equipo
+// maestro y solo habla por 127.0.0.1 con el backend. Ni el Master ni las
+// tabletas lo alcanzan: piden al backend y el backend decide.
+//
+// Nada de lo que llega aquí se guarda. Los títulos viajan en cada respuesta
+// porque el LMS no tiene catálogo propio: guarda referencias.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// <summary>Si la biblioteca está en este equipo, y qué sabe hacer.</summary>
+public sealed record ContenidoEstado(
+    [property: JsonPropertyName("disponible")] bool Available,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("componente")] string? Component,
+    [property: JsonPropertyName("contrato")] int? Contract,
+    [property: JsonPropertyName("generacion")] long? Generation,
+    [property: JsonPropertyName("generacion_derivada")] bool GenerationDerived,
+    [property: JsonPropertyName("huella_catalogo")] string? CatalogFingerprint,
+    [property: JsonPropertyName("capacidades")] List<string> Capabilities,
+    [property: JsonPropertyName("conteos")] ContenidoConteos Counts)
+{
+    public string Headline => Available
+        ? $"Biblioteca conectada · contrato {Contract}"
+        : "Biblioteca no disponible";
+
+    public string Detail => Available
+        ? $"{Counts.Elements} elementos en {Counts.Packages} paquete(s)"
+        : Reason;
+
+    /// <summary>
+    /// Las rutas del contrato que esta versión del componente todavía no
+    /// publica. Se enseña en pantalla para que la ausencia sea explicable.
+    /// </summary>
+    public bool HasExams => Capabilities.Contains("evaluacion") && Capabilities.Contains("comprobar");
+    public bool HasLessons => Capabilities.Contains("leccion");
+
+    public string CapabilitiesLabel => Capabilities.Count == 0
+        ? "Solo catálogo · esta versión no publica exámenes todavía"
+        : string.Join(" · ", Capabilities);
+}
+
+public sealed record ContenidoConteos(
+    [property: JsonPropertyName("elementos")] int? Elements,
+    [property: JsonPropertyName("paquetes")] int? Packages,
+    [property: JsonPropertyName("politicas")] int? Policies);
+
+/// <summary>Un elemento del catálogo, tal como lo publica el componente.</summary>
+public sealed record ContenidoElemento(
+    [property: JsonPropertyName("ref")] string Reference,
+    [property: JsonPropertyName("tipo")] string Kind,
+    [property: JsonPropertyName("titulo")] string Title,
+    [property: JsonPropertyName("nivel")] string? Level,
+    [property: JsonPropertyName("grado")] string? Grade,
+    [property: JsonPropertyName("asignatura")] string? Subject,
+    [property: JsonPropertyName("idioma")] string? Language,
+    [property: JsonPropertyName("taxonomia_ref")] string? TaxonomyReference,
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("duracion_seg")] int? DurationSeconds,
+    [property: JsonPropertyName("paquete")] string? Package)
+{
+    public string KindLabel => Kind switch
+    {
+        "documento" => "Documento",
+        "imagen" => "Lámina",
+        "video" => "Vídeo",
+        "audio" => "Audio",
+        "leccion" => "Lección",
+        "actividad" => "Actividad",
+        "evaluacion" => "Evaluación",
+        "interactivo" => "Interactivo",
+        "banco" => "Banco de preguntas",
+        // El caso por defecto devuelve el tipo crudo en vez de lanzar: el
+        // manifiesto admite más tipos de los que esto conoce, y llegará uno nuevo.
+        _ => Kind,
+    };
+
+    public string ContextLabel
+    {
+        get
+        {
+            var partes = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Level)) partes.Add(Level!);
+            if (!string.IsNullOrWhiteSpace(Grade)) partes.Add($"grado {Grade}");
+            if (!string.IsNullOrWhiteSpace(Subject)) partes.Add(Subject!);
+            return partes.Count == 0 ? "—" : string.Join(" · ", partes);
+        }
+    }
+
+    public string DurationLabel => DurationSeconds is > 0
+        ? $"{DurationSeconds / 60}:{DurationSeconds % 60:00}"
+        : "";
+}
+
+public sealed record ContenidoCatalogo(
+    [property: JsonPropertyName("count")] int Count,
+    [property: JsonPropertyName("elementos")] List<ContenidoElemento> Elements);
+
+/// <summary>
+/// Una referencia colgada de una lección. Available y Title NO están en la
+/// base: se acaban de resolver contra el componente.
+/// </summary>
+public sealed record UnidadMaterial(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("leccion")] string LessonId,
+    [property: JsonPropertyName("elemento_ref")] string Reference,
+    [property: JsonPropertyName("version_elemento")] string Version,
+    [property: JsonPropertyName("taxonomia_ref")] string? TaxonomyReference,
+    [property: JsonPropertyName("tipo")] string? Kind,
+    [property: JsonPropertyName("orden")] int Position,
+    [property: JsonPropertyName("disponible")] bool Available,
+    [property: JsonPropertyName("titulo")] string? Title,
+    [property: JsonPropertyName("version_actual")] string? CurrentVersion,
+    [property: JsonPropertyName("paquete")] string? Package,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("version_cambio")] bool VersionChanged)
+{
+    /// <summary>Sin componente no hay título, y no se inventa uno.</summary>
+    public string DisplayTitle => Available && !string.IsNullOrWhiteSpace(Title)
+        ? Title!
+        : Reference;
+
+    public string StateLabel => Available
+        ? (VersionChanged ? $"Disponible · hay versión {CurrentVersion}" : "Disponible")
+        : "No disponible ahora";
+
+    public string PositionLabel => $"{Position:00}";
+}
+
+public sealed record MaterialesDeLeccion(
+    [property: JsonPropertyName("leccion")] string LessonId,
+    [property: JsonPropertyName("componente_disponible")] bool ComponentAvailable,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("count")] int Count,
+    [property: JsonPropertyName("disponibles")] int AvailableCount,
+    [property: JsonPropertyName("materiales")] List<UnidadMaterial> Items)
+{
+    public string Summary => Count == 0
+        ? "Esta lección todavía no tiene material de la biblioteca."
+        : $"{AvailableCount} de {Count} disponibles ahora";
+}
+
+/// <summary>Un material proyectado a la clase en este momento.</summary>
+public sealed record RepartoEntrada(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("host_id")] string HostId,
+    [property: JsonPropertyName("sesion_clase_id")] string SessionId,
+    [property: JsonPropertyName("curso")] string? CourseId,
+    [property: JsonPropertyName("elemento_ref")] string Reference,
+    [property: JsonPropertyName("tipo")] string? Kind,
+    [property: JsonPropertyName("abierto_en")] long OpenedAt,
+    [property: JsonPropertyName("disponible")] bool Available,
+    [property: JsonPropertyName("titulo")] string? Title,
+    [property: JsonPropertyName("motivo")] string Reason)
+{
+    public string DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Title! : Reference;
+    public string StateLabel => Available ? "En la clase" : "En la clase · no disponible";
+}
+
+public sealed record RepartoLista(
+    [property: JsonPropertyName("componente_disponible")] bool ComponentAvailable,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("count")] int Count,
+    [property: JsonPropertyName("repartos")] List<RepartoEntrada> Items);
+
+/// <summary>Lo que una tableta puede abrir ahora. Sale del reparto, no del catálogo.</summary>
+public sealed record MaterialParaEstudiante(
+    [property: JsonPropertyName("elemento_ref")] string Reference,
+    [property: JsonPropertyName("tipo")] string? Kind,
+    [property: JsonPropertyName("abierto_en")] long OpenedAt,
+    [property: JsonPropertyName("disponible")] bool Available,
+    [property: JsonPropertyName("titulo")] string? Title,
+    [property: JsonPropertyName("duracion_seg")] int? DurationSeconds,
+    [property: JsonPropertyName("motivo")] string Reason)
+{
+    public string DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Title! : Reference;
+
+    public string KindLabel => Kind switch
+    {
+        "documento" => "Documento", "imagen" => "Lámina", "video" => "Vídeo",
+        "audio" => "Audio", "leccion" => "Lección", "actividad" => "Actividad",
+        "evaluacion" => "Evaluación", "interactivo" => "Interactivo",
+        _ => Kind ?? "Material",
+    };
+
+    public string StateLabel => Available
+        ? "Disponible"
+        : "No disponible ahora — el material salió del equipo";
+}
+
+public sealed record ContenidoParaEstudiante(
+    [property: JsonPropertyName("persona_id")] string PersonId,
+    [property: JsonPropertyName("componente_disponible")] bool ComponentAvailable,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("count")] int Count,
+    [property: JsonPropertyName("materiales")] List<MaterialParaEstudiante> Items);

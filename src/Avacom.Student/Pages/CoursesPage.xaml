@@ -16,6 +16,34 @@
             <VerticalStackLayout MaximumWidthRequest="1100" HorizontalOptions="Center" Spacing="22" Padding="0,4,0,28">
                 <Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="MIS CURSOS" Style="{StaticResource Eyebrow}" /><Label Text="¿Qué aprenderás hoy?" Style="{StaticResource PageTitle}" /></VerticalStackLayout><Button Grid.Column="1" Text="Actualizar" Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" VerticalOptions="Center" /></Grid>
                 <Label Text="{Binding Status}" TextColor="{StaticResource Muted}" />
+
+                <!-- Lo que el docente acaba de repartir desde la pantalla del aula.
+                     Va arriba de los cursos porque es lo que hay que mirar ahora. -->
+                <Border IsVisible="{Binding HayMaterialDeClase}" Style="{StaticResource SoftCard}" Padding="24">
+                    <VerticalStackLayout Spacing="14">
+                        <Label Text="MATERIAL DE LA CLASE" Style="{StaticResource Eyebrow}" />
+                        <CollectionView ItemsSource="{Binding MaterialDeClase}" SelectionMode="None">
+                            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="12" /></CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:MaterialParaEstudiante">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                                        <Border WidthRequest="56" HeightRequest="56" BackgroundColor="#E6F4FB" StrokeThickness="0" VerticalOptions="Center">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                            <Label Text="&#9636;" TextColor="{StaticResource Info}" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center" />
+                                        </Border>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                            <Label Text="{Binding KindLabel}" Style="{StaticResource Eyebrow}" />
+                                            <Label Text="{Binding DisplayTitle}" FontSize="19" FontAttributes="Bold" />
+                                            <!-- Cuando el material sale del equipo, esto lo explica en vez
+                                                 de que la tarjeta desaparezca sin motivo. -->
+                                            <Label Text="{Binding StateLabel}" FontSize="13" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
                 <CollectionView ItemsSource="{Binding Courses}" SelectionMode="None">
                     <CollectionView.ItemsLayout>
                         <GridItemsLayout Orientation="Vertical" Span="{OnIdiom Desktop=2, Tablet=2, Phone=1}"

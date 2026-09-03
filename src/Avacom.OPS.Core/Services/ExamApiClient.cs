@@ -45,6 +45,44 @@ public interface ILmsApiClient
         string courseId, string hostId, string? actor = null,
         CancellationToken cancellationToken = default);
 
+    // ── AVACOM-Contenido ────────────────────────────────────────────────────
+    // Todo pasa por el backend. Ni el Master ni el Student hablan nunca con el
+    // componente: vive en 127.0.0.1 del equipo maestro y su único cliente es el
+    // backend, que es quien decide qué puede ver cada quién.
+
+    /// <summary>Si la biblioteca está en el equipo y qué capacidades publica.</summary>
+    Task<ContenidoEstado> GetContenidoEstadoAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>El catálogo en vivo. No se cachea: lo desactivado por la escuela no debe verse.</summary>
+    Task<ContenidoCatalogo> GetContenidoCatalogoAsync(
+        string? nivel = null, string? grado = null, string? asignatura = null,
+        string? tipo = null, CancellationToken cancellationToken = default);
+
+    /// <summary>Qué material de la biblioteca cuelga de una lección.</summary>
+    Task<MaterialesDeLeccion> GetMaterialesAsync(string lessonId, CancellationToken cancellationToken = default);
+
+    /// <summary>Cuelga una referencia. La versión y el tipo los pone el componente.</summary>
+    Task<UnidadMaterial> AddMaterialAsync(string lessonId, string reference, CancellationToken cancellationToken = default);
+
+    /// <summary>Quita la referencia. NO desinstala el paquete del equipo.</summary>
+    Task RemoveMaterialAsync(string materialId, CancellationToken cancellationToken = default);
+
+    /// <summary>Proyecta un material en la pantalla del aula.</summary>
+    Task<JsonElement> MostrarContenidoAsync(string reference, CancellationToken cancellationToken = default);
+
+    Task<RepartoLista> GetRepartoAsync(string hostId, CancellationToken cancellationToken = default);
+
+    /// <summary>Reparte un material a la clase: es lo que las tabletas pueden abrir.</summary>
+    Task<JsonElement> RepartirAsync(
+        string hostId, string sessionId, string reference, string? courseId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<JsonElement> CerrarRepartoAsync(string repartoId, CancellationToken cancellationToken = default);
+
+    /// <summary>Lo que una tableta puede abrir ahora. Sale del reparto, no del catálogo.</summary>
+    Task<ContenidoParaEstudiante> GetContenidoEstudianteAsync(
+        string personId, string hostId, CancellationToken cancellationToken = default);
+
     Task<CourseEnrollment> EnrollStudentAsync(string courseId, string personId, CancellationToken cancellationToken = default);
     Task<QuizAttempt> StartQuizAsync(string activityId, string studentName, string personId, string deviceId, CancellationToken cancellationToken = default);
     Task ReportProgressAsync(string attemptId, int question, CancellationToken cancellationToken = default);
@@ -283,6 +321,72 @@ public sealed class LmsApiClient(HttpClient httpClient) : ILmsApiClient
         PostAsync<CourseUninstallResult>(
             $"api/courses/{Uri.EscapeDataString(courseId)}/uninstall/",
             new { host_id = hostId, actor = actor ?? "docente-ops" },
+            cancellationToken);
+
+    public Task<ContenidoEstado> GetContenidoEstadoAsync(CancellationToken cancellationToken = default) =>
+        GetAsync<ContenidoEstado>("api/contenido/estado/", cancellationToken);
+
+    public Task<ContenidoCatalogo> GetContenidoCatalogoAsync(
+        string? nivel = null, string? grado = null, string? asignatura = null,
+        string? tipo = null, CancellationToken cancellationToken = default)
+    {
+        var filtros = new List<string>();
+        void Anadir(string clave, string? valor)
+        {
+            if (!string.IsNullOrWhiteSpace(valor))
+                filtros.Add($"{clave}={Uri.EscapeDataString(valor!)}");
+        }
+        Anadir("nivel", nivel);
+        Anadir("grado", grado);
+        Anadir("asignatura", asignatura);
+        Anadir("tipo", tipo);
+        var consulta = filtros.Count == 0 ? "" : "?" + string.Join("&", filtros);
+        return GetAsync<ContenidoCatalogo>($"api/contenido/catalogo/{consulta}", cancellationToken);
+    }
+
+    public Task<MaterialesDeLeccion> GetMaterialesAsync(string lessonId, CancellationToken cancellationToken = default) =>
+        GetAsync<MaterialesDeLeccion>(
+            $"api/lecciones/{Uri.EscapeDataString(lessonId)}/materiales/", cancellationToken);
+
+    public Task<UnidadMaterial> AddMaterialAsync(string lessonId, string reference, CancellationToken cancellationToken = default) =>
+        PostAsync<UnidadMaterial>(
+            $"api/lecciones/{Uri.EscapeDataString(lessonId)}/materiales/",
+            new { elemento_ref = reference, actor = "docente-ops" }, cancellationToken);
+
+    public async Task RemoveMaterialAsync(string materialId, CancellationToken cancellationToken = default)
+    {
+        using var respuesta = await httpClient.DeleteAsync(
+            $"api/materiales/{Uri.EscapeDataString(materialId)}/", cancellationToken);
+        _ = await ReadAsync<JsonElement>(respuesta, null, cancellationToken);
+    }
+
+    public Task<JsonElement> MostrarContenidoAsync(string reference, CancellationToken cancellationToken = default) =>
+        PostAsync<JsonElement>("api/contenido/mostrar/", new { elemento_ref = reference }, cancellationToken);
+
+    public Task<RepartoLista> GetRepartoAsync(string hostId, CancellationToken cancellationToken = default) =>
+        GetAsync<RepartoLista>(
+            $"api/contenido/reparto/?host_id={Uri.EscapeDataString(hostId)}", cancellationToken);
+
+    public Task<JsonElement> RepartirAsync(
+        string hostId, string sessionId, string reference, string? courseId = null,
+        CancellationToken cancellationToken = default) =>
+        PostAsync<JsonElement>("api/contenido/reparto/", new
+        {
+            host_id = hostId,
+            sesion_clase_id = sessionId,
+            elemento_ref = reference,
+            curso = courseId,
+            actor = "docente-ops",
+        }, cancellationToken);
+
+    public Task<JsonElement> CerrarRepartoAsync(string repartoId, CancellationToken cancellationToken = default) =>
+        PostAsync<JsonElement>(
+            $"api/contenido/reparto/{Uri.EscapeDataString(repartoId)}/cerrar/", new { }, cancellationToken);
+
+    public Task<ContenidoParaEstudiante> GetContenidoEstudianteAsync(
+        string personId, string hostId, CancellationToken cancellationToken = default) =>
+        GetAsync<ContenidoParaEstudiante>(
+            $"api/students/{Uri.EscapeDataString(personId)}/contenido/?host_id={Uri.EscapeDataString(hostId)}",
             cancellationToken);
 
     public Task<CourseEnrollment> EnrollStudentAsync(string courseId, string personId, CancellationToken cancellationToken = default) =>

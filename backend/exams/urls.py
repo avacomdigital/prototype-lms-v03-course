@@ -58,7 +58,37 @@ from .views import (
 )
 
 
+from .views_contenido import (
+    ContenidoCatalogoView,
+    ContenidoElementoView,
+    ContenidoEstadoView,
+    ContenidoMostrarView,
+    ContenidoTaxonomiaView,
+    ExamenComprobarView,
+    ExamenMontarView,
+    LeccionMaterialView,
+    MaterialDetailView,
+    RepartoCerrarView,
+    RepartoView,
+    StudentContenidoView,
+)
+
 urlpatterns = [
+    # ── Integración con AVACOM-Contenido ─────────────────────────────────────
+    # El componente vive en el mismo equipo y solo habla por 127.0.0.1 con este
+    # backend. Ninguna tableta lo alcanza: piden aquí y aquí se decide.
+    path("contenido/estado/", ContenidoEstadoView.as_view(), name="contenido-estado"),
+    path("contenido/catalogo/", ContenidoCatalogoView.as_view(), name="contenido-catalogo"),
+    path("contenido/taxonomia/", ContenidoTaxonomiaView.as_view(), name="contenido-taxonomia"),
+    path("contenido/elemento/<path:referencia>/", ContenidoElementoView.as_view(), name="contenido-elemento"),
+    path("contenido/mostrar/", ContenidoMostrarView.as_view(), name="contenido-mostrar"),
+    path("contenido/reparto/", RepartoView.as_view(), name="contenido-reparto"),
+    path("contenido/reparto/<str:pk>/cerrar/", RepartoCerrarView.as_view(), name="contenido-reparto-cerrar"),
+    path("contenido/examen/montar/", ExamenMontarView.as_view(), name="contenido-examen-montar"),
+    path("contenido/examen/comprobar/", ExamenComprobarView.as_view(), name="contenido-examen-comprobar"),
+    path("lecciones/<str:leccion_id>/materiales/", LeccionMaterialView.as_view(), name="leccion-materiales"),
+    path("materiales/<str:pk>/", MaterialDetailView.as_view(), name="material-detalle"),
+    path("students/<str:persona_id>/contenido/", StudentContenidoView.as_view(), name="student-contenido"),
     path("curriculum-frameworks/", CurriculumFrameworkCollectionView.as_view()),
     path("curriculum-frameworks/<str:pk>/", CurriculumFrameworkDetailView.as_view()),
     path("courses/", CourseCollectionView.as_view(), name="courses"),

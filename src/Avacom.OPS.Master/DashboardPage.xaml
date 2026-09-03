@@ -22,6 +22,7 @@
                     <Button Text="＋  Crear curso" Command="{Binding ShowCreateCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="⬓  Importar curso" Command="{Binding ShowImportCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="⊖  Eliminar curso" Command="{Binding ShowDeleteCommand}" Style="{StaticResource NavButton}" />
+                    <Button Text="◫  Biblioteca" Command="{Binding ShowContenidoCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="◎  Estudiantes" Command="{Binding ShowStudentsCommand}" Style="{StaticResource NavButton}" />
                     <Button Text="↗  Resultados" Command="{Binding ShowResultsCommand}" Style="{StaticResource NavButton}" />
                 </VerticalStackLayout>
@@ -365,7 +366,7 @@
                                 <VerticalStackLayout>
                                     <Label Text="PAQUETE DE CURSO" Style="{StaticResource Eyebrow}" />
                                     <Label Text="Importar desde un archivo" Style="{StaticResource SectionTitle}" />
-                                    <Label Text="Acepta SCORM 1.2, SCORM 2004 y CMI5 en .zip, o el paquete nativo de AVACOM en .json. El formato se detecta solo."
+                                    <Label Text="Acepta AVACOM-Contenido, SCORM 1.2, SCORM 2004 y CMI5 en .zip, o el paquete de intercambio de AVACOM en .json. El formato se detecta solo."
                                            TextColor="{StaticResource Muted}" FontSize="13" />
                                 </VerticalStackLayout>
 
@@ -500,6 +501,12 @@
                         <Border Grid.Column="1" Style="{StaticResource SoftCard}" VerticalOptions="Start">
                             <VerticalStackLayout Spacing="16">
                                 <Label Text="Formatos que acepta" Style="{StaticResource SectionTitle}" />
+                                <Label Text="AVACOM-Contenido" FontAttributes="Bold" />
+                                <Label Text="Un .zip con formato.json y manifiesto.db. La taxonomía del paquete se aplana a dos niveles: los hijos de la raíz son secciones, y los nodos que llevan material son lecciones."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <Label Text="Un paquete PUBLICADO va cifrado y necesita la licencia de este equipo; se importa el paquete en claro."
+                                       TextColor="{StaticResource Muted}" FontSize="12" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
                                 <Label Text="SCORM 1.2 · SCORM 2004" FontAttributes="Bold" />
                                 <Label Text="Un .zip con imsmanifest.xml. La organization se vuelve el curso; los item de nivel 1 y 2, secciones y lecciones."
                                        TextColor="{StaticResource Muted}" FontSize="13" />
@@ -508,10 +515,10 @@
                                 <Label Text="Un .zip con cmi5.xml. El course se vuelve el curso; los block, secciones y lecciones; cada AU, una actividad."
                                        TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                                <Label Text="Paquete AVACOM" FontAttributes="Bold" />
+                                <Label Text="Paquete de intercambio" FontAttributes="Bold" />
                                 <Label Text="Un .json con schema avacom-course-package/v1." TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
-                                <Label Text="Los tres terminan en el mismo árbol" FontAttributes="Bold" />
+                                <Label Text="Todos terminan en el mismo árbol" FontAttributes="Bold" />
                                 <Label Text="curso → sección → lección → ítem. El formato es de entrada, no un modelo distinto."
                                        TextColor="{StaticResource Muted}" FontSize="13" />
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
@@ -690,6 +697,176 @@
                                 <BoxView HeightRequest="1" Color="{StaticResource Line}" />
                                 <Label Text="Desinstalar contenido no es borrar entidades académicas."
                                        TextColor="{StaticResource Info}" FontSize="12" FontAttributes="Bold" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </ScrollView>
+
+                <!-- BIBLIOTECA · AVACOM-Contenido -->
+                <ScrollView IsVisible="{Binding IsContenido}">
+                    <Grid ColumnDefinitions="1.5*,0.9*" ColumnSpacing="22" Padding="2,2,8,24">
+                        <VerticalStackLayout Spacing="18">
+
+                            <!-- Estado del componente. Es lo primero porque decide
+                                 si hay algo que ofrecer o hay que explicar por qué no. -->
+                            <Border Style="{StaticResource SoftCard}" Padding="26">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                                    <Ellipse WidthRequest="12" HeightRequest="12" VerticalOptions="Center" Fill="{StaticResource Danger}">
+                                        <Ellipse.Triggers>
+                                            <DataTrigger TargetType="Ellipse" Binding="{Binding HasContenido}" Value="True">
+                                                <Setter Property="Fill" Value="{StaticResource Success}" />
+                                            </DataTrigger>
+                                        </Ellipse.Triggers>
+                                    </Ellipse>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                        <Label Text="{Binding ContenidoEstado.Headline}" FontSize="18" FontAttributes="Bold" />
+                                        <Label Text="{Binding ContenidoEstado.Detail}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                        <Label Text="{Binding ContenidoEstado.CapabilitiesLabel}" TextColor="{StaticResource Info}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="2" Text="Actualizar" Command="{Binding RefreshContenidoCommand}"
+                                            Style="{StaticResource SecondaryButton}" HeightRequest="52" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Sin biblioteca el panel no se queda en blanco: dice qué pasa. -->
+                            <Border IsVisible="{Binding SinContenido}" Style="{StaticResource SoftCard}" Padding="30">
+                                <VerticalStackLayout Spacing="10">
+                                    <Label Text="NO HAY BIBLIOTECA EN ESTE EQUIPO" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Danger}" />
+                                    <Label Text="{Binding ContenidoStatus}" FontSize="14" />
+                                    <Label Text="El resto del LMS sigue funcionando igual: los cursos, las notas y el progreso no dependen de la biblioteca."
+                                           TextColor="{StaticResource Muted}" FontSize="13" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- Lo repartido a la clase ahora mismo -->
+                            <Border IsVisible="{Binding HasReparto}" Style="{StaticResource SoftCard}" Padding="26">
+                                <VerticalStackLayout Spacing="14">
+                                    <Label Text="EN LAS TABLETAS AHORA" Style="{StaticResource Eyebrow}" />
+                                    <CollectionView ItemsSource="{Binding Reparto}" SelectionMode="None">
+                                        <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:RepartoEntrada">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                                    <VerticalStackLayout Spacing="3">
+                                                        <Label Text="{Binding DisplayTitle}" FontAttributes="Bold" FontSize="15" />
+                                                        <Label Text="{Binding StateLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                                    </VerticalStackLayout>
+                                                    <Button Grid.Column="1" Text="Retirar"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.WithdrawContenidoCommand}"
+                                                            CommandParameter="{Binding .}"
+                                                            Style="{StaticResource SecondaryButton}" TextColor="{StaticResource Danger}"
+                                                            HeightRequest="48" WidthRequest="118" FontSize="13" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- El catálogo en vivo -->
+                            <Border IsVisible="{Binding HasContenido}" Style="{StaticResource SoftCard}" Padding="26">
+                                <VerticalStackLayout Spacing="16">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                        <VerticalStackLayout Spacing="3">
+                                            <Label Text="MATERIAL INSTALADO EN EL AULA" Style="{StaticResource Eyebrow}" />
+                                            <Label Text="{Binding ContenidoStatus}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="1" Style="{StaticResource FieldBorder}" WidthRequest="210">
+                                            <Picker ItemsSource="{Binding TiposDeContenido}"
+                                                    SelectedItem="{Binding ContenidoFiltroTipo}"
+                                                    Title="Todos los tipos" HeightRequest="52" />
+                                        </Border>
+                                    </Grid>
+
+                                    <CollectionView ItemsSource="{Binding Contenido}" SelectionMode="None">
+                                        <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="12" /></CollectionView.ItemsLayout>
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:ContenidoElemento">
+                                                <Border Padding="18" BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}">
+                                                    <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                                        <VerticalStackLayout Spacing="5">
+                                                            <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="16" />
+                                                            <HorizontalStackLayout Spacing="8">
+                                                                <Border Padding="10,4" BackgroundColor="#F3EFFA" StrokeThickness="0">
+                                                                    <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                                                                    <Label Text="{Binding KindLabel}" FontSize="11" FontAttributes="Bold" />
+                                                                </Border>
+                                                                <Label Text="{Binding ContextLabel}" TextColor="{StaticResource Muted}" FontSize="12" VerticalTextAlignment="Center" />
+                                                            </HorizontalStackLayout>
+                                                            <!-- La referencia es lo único que el LMS guardará de esto. -->
+                                                            <Label Text="{Binding Reference}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                                        </VerticalStackLayout>
+                                                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center">
+                                                            <Button Text="Proyectar"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ProjectContenidoCommand}"
+                                                                    CommandParameter="{Binding .}"
+                                                                    Style="{StaticResource SecondaryButton}" HeightRequest="48" WidthRequest="112" FontSize="13" />
+                                                            <Button Text="A las tabletas"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ShareContenidoCommand}"
+                                                                    CommandParameter="{Binding .}"
+                                                                    Style="{StaticResource SecondaryButton}" HeightRequest="48" WidthRequest="132" FontSize="13" />
+                                                            <Button Text="Colgar"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AttachContenidoCommand}"
+                                                                    CommandParameter="{Binding .}"
+                                                                    Style="{StaticResource SecondaryButton}" HeightRequest="48" WidthRequest="100" FontSize="13" />
+                                                        </HorizontalStackLayout>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <!-- Lo que ya cuelga de la lección del curso elegido -->
+                            <Border IsVisible="{Binding HasMateriales}" Style="{StaticResource SoftCard}" Padding="26">
+                                <VerticalStackLayout Spacing="14">
+                                    <Label Text="COLGADO EN LA LECCIÓN" Style="{StaticResource Eyebrow}" />
+                                    <Label Text="{Binding Materiales.Summary}" TextColor="{StaticResource Muted}" FontSize="13" />
+                                    <CollectionView ItemsSource="{Binding Materiales.Items}" SelectionMode="None">
+                                        <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:UnidadMaterial">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                                    <Label Text="{Binding PositionLabel}" TextColor="{StaticResource Muted}" FontSize="12" VerticalOptions="Center" />
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                                        <Label Text="{Binding DisplayTitle}" FontAttributes="Bold" FontSize="15" />
+                                                        <Label Text="{Binding StateLabel}" FontSize="12" TextColor="{StaticResource Muted}" />
+                                                        <!-- Cuando el paquete no está, esto explica por qué en vez
+                                                             de dejar la fila muda. -->
+                                                        <Label Text="{Binding Reason}" FontSize="11" TextColor="{StaticResource Danger}" />
+                                                    </VerticalStackLayout>
+                                                    <Button Grid.Column="2" Text="Quitar"
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DetachMaterialCommand}"
+                                                            CommandParameter="{Binding .}"
+                                                            Style="{StaticResource SecondaryButton}" HeightRequest="48" WidthRequest="106" FontSize="13" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Primary}" />
+                        </VerticalStackLayout>
+
+                        <Border Grid.Column="1" Style="{StaticResource SoftCard}" VerticalOptions="Start">
+                            <VerticalStackLayout Spacing="16">
+                                <Label Text="Cómo funciona" Style="{StaticResource SectionTitle}" />
+                                <Label Text="El LMS no copia el contenido" FontAttributes="Bold" />
+                                <Label Text="La biblioteca es otro producto y corre en este mismo equipo. Al colgar material, el curso guarda su referencia y su versión; el título que ves se acaba de pedir."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="Por eso se puede quitar y volver a poner" FontAttributes="Bold" />
+                                <Label Text="Si el paquete se desinstala, la referencia sigue en la lección marcada como no disponible. Las notas, el progreso y las matrículas no se enteran. Al reinstalarlo vuelve solo."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="Las tabletas no ven la biblioteca" FontAttributes="Bold" />
+                                <Label Text="El componente solo escucha en 127.0.0.1 y su único cliente es este backend. Una tableta abre lo que el docente repartió, y lo pide al backend."
+                                       TextColor="{StaticResource Muted}" FontSize="13" />
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                <Label Text="{Binding LeccionDestinoLabel}" TextColor="{StaticResource Info}" FontSize="12" FontAttributes="Bold" />
                             </VerticalStackLayout>
                         </Border>
                     </Grid>

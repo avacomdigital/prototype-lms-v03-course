@@ -40,6 +40,19 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     private string _newDescription = "";
     private CurriculumFramework? _newFrameworkItem;
     private string _importFileName = "";
+    /// <summary>
+    /// Cada cuánto se pregunta si el catálogo cambió mientras la pantalla está a
+    /// la vista. El docente puede deshabilitar material desde AVACOM-Contenido en
+    /// cualquier momento y el panel no debe quedarse mostrando lo de antes.
+    /// </summary>
+    private static readonly TimeSpan IntervaloContenido = TimeSpan.FromSeconds(6);
+
+    private CancellationTokenSource? _vigilanciaContenido;
+    private string _huellaContenido = "";
+    private ContenidoEstado? _contenidoEstado;
+    private MaterialesDeLeccion? _materiales;
+    private string _contenidoStatus = "Consultando la biblioteca del aula…";
+    private string _contenidoFiltroTipo = "";
     private InstalledCourseCard? _courseToDelete;
     private CourseUninstallResult? _deleteResult;
     private string _deleteStatus = "Elige el curso que quieres retirar de esta OPS.";
@@ -47,7 +60,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     private ZipPackageDetected? _importZipDetected;
     private ZipInstallResult? _importZipResult;
     private string _importTitle = "";
-    private string _importStatus = "Abre un paquete .zip (SCORM o CMI5) o un .json de AVACOM.";
+    private string _importStatus = "Abre un paquete .zip (AVACOM-Contenido, SCORM o CMI5) o un .json de AVACOM.";
     private CurriculumFramework? _importFramework;
     private CoursePackagePreview? _importPreview;
     private CoursePackageImportResult? _importResult;
@@ -80,6 +93,27 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         CloseDetailCommand = new Command(() => SelectedDetail = null);
         AddSectionCommand = new Command(() => AddSection());
         ShowImportCommand = new Command(() => CurrentView = "import");
+        ShowContenidoCommand = new Command(async () =>
+        {
+            CurrentView = "contenido";
+            await LoadContenidoAsync();
+            VigilarContenido();
+        });
+        RefreshContenidoCommand = new Command(
+            async () => await LoadContenidoAsync(), () => !IsBusy);
+        // Proyectar lo abre en la pantalla del aula: lo hace el componente, no el
+        // Master. El Master pide.
+        ProjectContenidoCommand = new Command<ContenidoElemento>(
+            async elemento => await ProjectContenidoAsync(elemento));
+        // Repartir es lo que hace que las tabletas puedan abrirlo.
+        ShareContenidoCommand = new Command<ContenidoElemento>(
+            async elemento => await ShareContenidoAsync(elemento));
+        WithdrawContenidoCommand = new Command<RepartoEntrada>(
+            async entrada => await WithdrawContenidoAsync(entrada));
+        AttachContenidoCommand = new Command<ContenidoElemento>(
+            async elemento => await AttachContenidoAsync(elemento));
+        DetachMaterialCommand = new Command<UnidadMaterial>(
+            async material => await DetachMaterialAsync(material));
         ShowDeleteCommand = new Command(async () =>
         {
             CurrentView = "delete";
@@ -146,6 +180,13 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     public Command ImportPackageCommand { get; }
     public Command ClearImportCommand { get; }
     public Command ShowDeleteCommand { get; }
+    public Command ShowContenidoCommand { get; }
+    public Command RefreshContenidoCommand { get; }
+    public Command<ContenidoElemento> ProjectContenidoCommand { get; }
+    public Command<ContenidoElemento> ShareContenidoCommand { get; }
+    public Command<RepartoEntrada> WithdrawContenidoCommand { get; }
+    public Command<ContenidoElemento> AttachContenidoCommand { get; }
+    public Command<UnidadMaterial> DetachMaterialCommand { get; }
     public Command<InstalledCourseCard> SelectForDeletionCommand { get; }
     public Command CancelDeletionCommand { get; }
     public Command ConfirmDeletionCommand { get; }
@@ -164,10 +205,14 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         set
         {
             if (!Set(ref _currentView, value)) return;
+            // Salir de la Biblioteca corta su sondeo: no tiene sentido preguntar
+            // por un catálogo que nadie está mirando.
+            if (value != "contenido") DetenerVigilanciaContenido();
             Notify(nameof(IsOverview));
             Notify(nameof(IsCreate));
             Notify(nameof(IsImport));
             Notify(nameof(IsDelete));
+            Notify(nameof(IsContenido));
             Notify(nameof(IsStudents));
             Notify(nameof(IsResults));
             Notify(nameof(PageTitle));
@@ -179,6 +224,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     public bool IsCreate => CurrentView == "create";
     public bool IsImport => CurrentView == "import";
     public bool IsDelete => CurrentView == "delete";
+    public bool IsContenido => CurrentView == "contenido";
     public bool IsStudents => CurrentView == "students";
     public bool IsResults => CurrentView == "results";
     public string PageTitle => CurrentView switch
@@ -186,6 +232,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         "create" => "Crear un curso",
         "import" => "Importar un curso",
         "delete" => "Eliminar un curso",
+        "contenido" => "Biblioteca del aula",
         "students" => "Asignar estudiantes",
         "results" => "Actividad en vivo",
         _ => "Panel del curso",
@@ -193,8 +240,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     public string PageSubtitle => CurrentView switch
     {
         "create" => "Construye la estructura esencial en tres pasos claros.",
-        "import" => "Abre un .zip SCORM o CMI5 y déjalo disponible en esta OPS.",
+        "import" => "Abre un .zip AVACOM-Contenido, SCORM o CMI5 y déjalo disponible en esta OPS.",
         "delete" => "Retira el contenido de esta OPS. El progreso de los estudiantes se conserva.",
+        "contenido" => "El material instalado en este equipo, en vivo. El LMS lo referencia, no lo copia.",
         "students" => "Vincula estudiantes al curso seleccionado.",
         "results" => "Sigue la pregunta actual y el consolidado de notas.",
         _ => "Una vista sintetizada de lo que verá el estudiante.",
@@ -251,6 +299,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         PickPackageCommand.ChangeCanExecute();
         ImportPackageCommand.ChangeCanExecute();
         ConfirmDeletionCommand.ChangeCanExecute();
+        RefreshContenidoCommand.ChangeCanExecute();
         CreateCourseCommand.ChangeCanExecute();
         AssignStudentCommand.ChangeCanExecute();
     }
@@ -376,6 +425,61 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         get => _endpoint.HostId;
         set { _endpoint.HostId = value; Notify(); }
     }
+
+    /// <summary>
+    /// Lo que la biblioteca del aula ofrece AHORA. No se guarda: cada vez que se
+    /// entra a la pantalla se vuelve a pedir, porque el LMS no tiene catálogo
+    /// propio y cachearlo acabaría ofreciendo material que la escuela desactivó.
+    /// </summary>
+    public ObservableCollection<ContenidoElemento> Contenido { get; } = [];
+
+    /// <summary>Lo que está proyectado a la clase en este momento.</summary>
+    public ObservableCollection<RepartoEntrada> Reparto { get; } = [];
+
+    public ContenidoEstado? ContenidoEstado
+    {
+        get => _contenidoEstado;
+        private set
+        {
+            Set(ref _contenidoEstado, value);
+            Notify(nameof(HasContenido));
+            Notify(nameof(SinContenido));
+        }
+    }
+
+    public bool HasContenido => ContenidoEstado?.Available == true;
+    public bool SinContenido => ContenidoEstado is not null && !ContenidoEstado.Available;
+    public bool HasReparto => Reparto.Count > 0;
+
+    /// <summary>El material de la biblioteca colgado de la lección seleccionada.</summary>
+    public MaterialesDeLeccion? Materiales
+    {
+        get => _materiales;
+        private set { Set(ref _materiales, value); Notify(nameof(HasMateriales)); }
+    }
+
+    public bool HasMateriales => Materiales is not null && Materiales.Count > 0;
+
+    public string ContenidoStatus { get => _contenidoStatus; private set => Set(ref _contenidoStatus, value); }
+
+    /// <summary>Filtro por tipo. Vacío es «todo».</summary>
+    public string ContenidoFiltroTipo
+    {
+        get => _contenidoFiltroTipo;
+        set { if (Set(ref _contenidoFiltroTipo, value)) _ = LoadContenidoAsync(); }
+    }
+
+    /// <summary>Los tipos que el manifiesto admite hoy. La lista puede crecer.</summary>
+    public IReadOnlyList<string> TiposDeContenido { get; } =
+        ["", "documento", "imagen", "video", "audio", "leccion", "actividad", "evaluacion", "interactivo"];
+
+    /// <summary>La lección donde se cuelga el material elegido.</summary>
+    public Lesson? LeccionDestino =>
+        SelectedCourse?.Sections.FirstOrDefault()?.Lessons.FirstOrDefault();
+
+    public string LeccionDestinoLabel => LeccionDestino is null
+        ? "Elige un curso en Resumen para poder colgar material"
+        : $"Se colgará en «{LeccionDestino.Title}»";
 
     /// <summary>Los cursos presentes en esta OPS. Una tarjeta por curso.</summary>
     public ObservableCollection<InstalledCourseCard> InstalledCourses { get; } = [];
@@ -926,6 +1030,198 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         finally { IsBusy = false; }
     }
 
+    /// <summary>
+    /// Trae el estado de la biblioteca, su catálogo y lo repartido.
+    ///
+    /// Si la biblioteca no está, esto NO falla: deja el catálogo vacío y el
+    /// motivo en pantalla. El resto del panel sigue funcionando igual, que es la
+    /// regla que gobierna toda la integración.
+    /// </summary>
+    private async Task LoadContenidoAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            var estado = await _api.GetContenidoEstadoAsync();
+            ContenidoEstado = estado;
+            _huellaContenido = $"{estado.Available}:{estado.CatalogFingerprint}";
+
+            Contenido.Clear();
+            Reparto.Clear();
+
+            if (!estado.Available)
+            {
+                ContenidoStatus = estado.Reason;
+                Notify(nameof(HasReparto));
+                return;
+            }
+
+            var catalogo = await _api.GetContenidoCatalogoAsync(tipo: ContenidoFiltroTipo);
+            foreach (var elemento in catalogo.Elements) Contenido.Add(elemento);
+
+            var repartido = await _api.GetRepartoAsync(HostId);
+            foreach (var entrada in repartido.Items) Reparto.Add(entrada);
+
+            if (LeccionDestino is not null)
+                Materiales = await _api.GetMaterialesAsync(LeccionDestino.Id);
+
+            ContenidoStatus = catalogo.Count == 0
+                ? "La biblioteca está conectada pero no ofrece nada con ese filtro."
+                : $"{catalogo.Count} elemento(s) · {Reparto.Count} repartido(s) a la clase";
+        }
+        catch (LmsApiException exception)
+        {
+            ContenidoStatus = $"No se pudo consultar la biblioteca: {ExtractDetail(exception.ResponseBody)}";
+            await _log.WriteAsync("contenido", "load_failed", exception);
+        }
+        catch (Exception exception)
+        {
+            ContenidoStatus = $"No se pudo consultar la biblioteca: {exception.Message}";
+            await _log.WriteAsync("contenido", "load_failed", exception);
+        }
+        finally
+        {
+            Notify(nameof(HasReparto));
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Pregunta cada pocos segundos si el catálogo cambió, y solo entonces lo
+    /// recarga.
+    ///
+    /// La comparación es contra la huella que publica el backend: `generacion`
+    /// cuando el componente la publique, y mientras tanto los contadores. Es una
+    /// petición diminuta; recargar el catálogo entero cada seis segundos sí sería
+    /// caro y además haría parpadear la lista.
+    /// </summary>
+    private void VigilarContenido()
+    {
+        DetenerVigilanciaContenido();
+        var cancelacion = new CancellationTokenSource();
+        _vigilanciaContenido = cancelacion;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!cancelacion.IsCancellationRequested)
+                {
+                    await Task.Delay(IntervaloContenido, cancelacion.Token);
+                    if (!IsContenido) return;
+
+                    ContenidoEstado estado;
+                    try { estado = await _api.GetContenidoEstadoAsync(cancelacion.Token); }
+                    catch (Exception) { continue; }   // se reintenta al siguiente turno
+
+                    var huella = $"{estado.Available}:{estado.CatalogFingerprint}";
+                    if (huella == _huellaContenido) continue;
+                    _huellaContenido = huella;
+
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        await LoadContenidoAsync();
+                        ContenidoStatus += "  ·  la biblioteca cambió y se recargó sola.";
+                    });
+                }
+            }
+            catch (OperationCanceledException) { /* se salió de la pantalla */ }
+        }, cancelacion.Token);
+    }
+
+    private void DetenerVigilanciaContenido()
+    {
+        _vigilanciaContenido?.Cancel();
+        _vigilanciaContenido?.Dispose();
+        _vigilanciaContenido = null;
+    }
+
+    private async Task ProjectContenidoAsync(ContenidoElemento? elemento)
+    {
+        if (elemento is null) return;
+        try
+        {
+            await _api.MostrarContenidoAsync(elemento.Reference);
+            ContenidoStatus = $"«{elemento.Title}» se está proyectando en la pantalla del aula.";
+        }
+        catch (LmsApiException exception)
+        {
+            ContenidoStatus = $"No se pudo proyectar: {ExtractDetail(exception.ResponseBody)}";
+        }
+    }
+
+    private async Task ShareContenidoAsync(ContenidoElemento? elemento)
+    {
+        if (elemento is null) return;
+        try
+        {
+            await _api.RepartirAsync(HostId, SesionClaseId, elemento.Reference, SelectedCourse?.Id);
+            ContenidoStatus = $"«{elemento.Title}» ya está en las tabletas.";
+            await LoadContenidoAsync();
+        }
+        catch (LmsApiException exception)
+        {
+            ContenidoStatus = $"No se pudo repartir: {ExtractDetail(exception.ResponseBody)}";
+        }
+    }
+
+    private async Task WithdrawContenidoAsync(RepartoEntrada? entrada)
+    {
+        if (entrada is null) return;
+        try
+        {
+            await _api.CerrarRepartoAsync(entrada.Id);
+            ContenidoStatus = $"«{entrada.DisplayTitle}» se retiró de las tabletas.";
+            await LoadContenidoAsync();
+        }
+        catch (LmsApiException exception)
+        {
+            ContenidoStatus = $"No se pudo retirar: {ExtractDetail(exception.ResponseBody)}";
+        }
+    }
+
+    private async Task AttachContenidoAsync(ContenidoElemento? elemento)
+    {
+        if (elemento is null || LeccionDestino is null)
+        {
+            ContenidoStatus = "Elige primero un curso en Resumen: el material se cuelga de una lección.";
+            return;
+        }
+        try
+        {
+            await _api.AddMaterialAsync(LeccionDestino.Id, elemento.Reference);
+            Materiales = await _api.GetMaterialesAsync(LeccionDestino.Id);
+            ContenidoStatus = $"«{elemento.Title}» quedó en «{LeccionDestino.Title}». " +
+                              "Se guardó la referencia, no una copia.";
+        }
+        catch (LmsApiException exception)
+        {
+            ContenidoStatus = $"No se pudo colgar: {ExtractDetail(exception.ResponseBody)}";
+        }
+    }
+
+    private async Task DetachMaterialAsync(UnidadMaterial? material)
+    {
+        if (material is null) return;
+        try
+        {
+            await _api.RemoveMaterialAsync(material.Id);
+            if (LeccionDestino is not null)
+                Materiales = await _api.GetMaterialesAsync(LeccionDestino.Id);
+            ContenidoStatus = "Se quitó de la lección. El paquete sigue instalado en el equipo.";
+        }
+        catch (LmsApiException exception)
+        {
+            ContenidoStatus = $"No se pudo quitar: {ExtractDetail(exception.ResponseBody)}";
+        }
+    }
+
+    /// <summary>
+    /// La clase en curso. En el prototipo es una por equipo y por día; cuando
+    /// haya horario de verdad, saldrá de ahí.
+    /// </summary>
+    public string SesionClaseId => $"{HostId}-clase";
+
     /// <summary>Trae las tarjetas de lo que hay presente en esta OPS.</summary>
     private async Task LoadInstalledAsync()
     {
@@ -1022,7 +1318,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         _importFile = null;
         LimpiarPrevias();
         ImportTitle = "";
-        ImportStatus = "Abre un paquete .zip (SCORM o CMI5) o un .json de AVACOM.";
+        ImportStatus = "Abre un paquete .zip (AVACOM-Contenido, SCORM o CMI5) o un .json de AVACOM.";
     }
 
     /// <summary>

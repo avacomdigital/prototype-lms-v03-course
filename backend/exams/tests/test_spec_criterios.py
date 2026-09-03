@@ -9,6 +9,7 @@ pruebas de unidad e integración que protegen los mismos invariantes.
 
 import base64
 import io
+import json
 import os
 import zipfile
 
@@ -21,6 +22,7 @@ from exams.models import (
     Course,
     CourseEnrollment,
     CourseHost,
+    Lesson,
     LessonProgress,
     QuizAttempt,
 )
@@ -822,3 +824,385 @@ class CatalogoDelEstudianteTests(TestCase):
         with override_settings(AVACOM_HOST_ID="OPS-CONFIGURADA"):
             respuesta = self.client.get(reverse("courses"), {"student": "1"})
             self.assertIn("CURSO-PROPIO", [c["id"] for c in respuesta.json()])
+
+
+# ── Constructor de paquetes AVACOM-Contenido ─────────────────────────────────
+MANIFIESTO_ESQUEMA = """
+CREATE TABLE p_paquete (
+  clave_paquete TEXT PRIMARY KEY, version TEXT NOT NULL, formato_version INTEGER NOT NULL,
+  pais TEXT NOT NULL, nivel_clave TEXT NOT NULL, grado TEXT, asignatura TEXT,
+  idioma TEXT NOT NULL, titulo TEXT NOT NULL, descripcion TEXT,
+  emitido_en INTEGER NOT NULL, emisor TEXT NOT NULL,
+  elementos INTEGER NOT NULL, tamano_medios_bytes INTEGER NOT NULL,
+  huella_manifiesto TEXT NOT NULL
+);
+CREATE TABLE p_taxonomia (
+  taxonomia_ref TEXT PRIMARY KEY, padre_ref TEXT, tipo_nodo TEXT NOT NULL,
+  codigo TEXT, nombre TEXT NOT NULL, orden INTEGER NOT NULL, objetivo TEXT
+);
+CREATE TABLE p_elemento (
+  elemento_ref TEXT PRIMARY KEY, version_elemento TEXT NOT NULL, tipo TEXT NOT NULL,
+  titulo TEXT NOT NULL, descripcion TEXT, taxonomia_ref TEXT,
+  duracion_seg INTEGER, paginas INTEGER, huella_archivo TEXT, tamano_bytes INTEGER,
+  estado TEXT NOT NULL DEFAULT 'vigente', sucesor_ref TEXT, accesibilidad TEXT
+);
+CREATE TABLE p_leccion_item (
+  elemento_ref TEXT NOT NULL, orden INTEGER NOT NULL, item_ref TEXT NOT NULL, nota TEXT,
+  PRIMARY KEY(elemento_ref, orden)
+);
+CREATE TABLE p_pregunta (
+  pregunta_ref TEXT PRIMARY KEY, elemento_ref TEXT NOT NULL, orden INTEGER NOT NULL,
+  tipo TEXT NOT NULL, enunciado TEXT NOT NULL, clave_respuesta TEXT,
+  peso REAL NOT NULL DEFAULT 1, dificultad TEXT, version_pregunta TEXT NOT NULL,
+  retroalimentacion TEXT
+);
+CREATE TABLE p_rubrica (
+  rubrica_ref TEXT PRIMARY KEY, elemento_ref TEXT NOT NULL, criterio TEXT NOT NULL,
+  descriptor TEXT, peso REAL NOT NULL DEFAULT 1, orden INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE p_voz (
+  voz_ref TEXT PRIMARY KEY, elemento_ref TEXT, pregunta_ref TEXT,
+  idioma TEXT NOT NULL, huella_archivo TEXT NOT NULL, duracion_ms INTEGER
+);
+"""
+
+
+def manifiesto_avacom(taxonomia, elementos, listas=(), preguntas=(), titulo="Curso AVACOM"):
+    """Un manifiesto.db en memoria, con la misma forma que produce el empaquetador."""
+    import sqlite3
+
+    conexion = sqlite3.connect(":memory:")
+    conexion.executescript(MANIFIESTO_ESQUEMA)
+    conexion.execute(
+        "INSERT INTO p_paquete VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("co-prueba-avacom", "1", 1, "CO", "secundaria", "8", "Matemáticas", "es",
+         titulo, "Paquete de prueba", 0, "AVACOM", len(elementos), 0, "x" * 64),
+    )
+    for t in taxonomia:
+        conexion.execute(
+            "INSERT INTO p_taxonomia (taxonomia_ref,padre_ref,tipo_nodo,codigo,nombre,orden) "
+            "VALUES (?,?,?,?,?,?)", t)
+    for e in elementos:
+        conexion.execute(
+            "INSERT INTO p_elemento (elemento_ref,version_elemento,tipo,titulo,taxonomia_ref,"
+            "duracion_seg,huella_archivo,estado) VALUES (?,?,?,?,?,?,?,?)", e)
+    for l in listas:
+        conexion.execute(
+            "INSERT INTO p_leccion_item (elemento_ref,orden,item_ref) VALUES (?,?,?)", l)
+    for q in preguntas:
+        conexion.execute(
+            "INSERT INTO p_pregunta (pregunta_ref,elemento_ref,orden,tipo,enunciado,"
+            "clave_respuesta,version_pregunta) VALUES (?,?,?,?,?,?,?)", q)
+    conexion.commit()
+    datos = conexion.serialize()
+    conexion.close()
+    return datos
+
+
+def zip_avacom(manifiesto=None, cifrado=False, carpeta="avacom-co-prueba-v1", **kwargs):
+    """Un .zip con la forma de un paquete AVACOM-Contenido."""
+    if manifiesto is None and not cifrado:
+        manifiesto = manifiesto_avacom(**kwargs)
+
+    descriptor = {
+        "formato_version": 1,
+        "clave_paquete": "co-prueba-avacom",
+        "version": "1",
+        "emisor": "AVACOM",
+        "clave_publica": "ab" * 32,
+    }
+    if cifrado:
+        descriptor["cifrado"] = {"algoritmo": "AES-256-GCM"}
+        descriptor["vitrina"] = {
+            "pais": "CO", "nivel_clave": "secundaria", "grado": "8",
+            "asignatura": "Matemáticas", "idioma": "es",
+            "titulo": "Matemáticas · Grado 8", "elementos": 5,
+        }
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        prefijo = f"{carpeta}/" if carpeta else ""
+        zf.writestr(f"{prefijo}formato.json", json.dumps(descriptor, ensure_ascii=False))
+        zf.writestr(f"{prefijo}firma.sig", b"\x00" * 64)
+        if cifrado:
+            zf.writestr(f"{prefijo}manifiesto.enc", b"cifrado-ilegible")
+        else:
+            zf.writestr(f"{prefijo}manifiesto.db", manifiesto)
+    return buffer.getvalue()
+
+
+# La taxonomía de los ejemplos reales: una raíz envoltorio, y debajo lo que de
+# verdad organiza el curso.
+TAX_BASE = [
+    #  ref,        padre,        tipo_nodo,      codigo,        nombre,             orden
+    ("area",       None,         "area",         None,          "Matemáticas",        1),
+    ("var",        "area",       "pensamiento",  None,          "Pensamiento variacional", 1),
+    ("var-e1",     "var",        "estandar",     "EBC-8-VAR-01", "Identifico relaciones", 1),
+    ("var-t1",     "var-e1",     "tema",         "DBA-8-05",    "Función lineal",     1),
+    ("num",        "area",       "pensamiento",  None,          "Pensamiento numérico", 2),
+]
+
+
+class AvacomContenidoTests(TestCase):
+    """
+    El tercer formato de entrada: los paquetes del componente de contenido.
+
+    Traen una taxonomía de profundidad libre —preescolar usa propósito /
+    actividad rectora / experiencia / aprendizaje, secundaria usa área /
+    pensamiento / estándar / tema— y hay que aplanarla a los dos niveles del
+    LMS sin inventar estructura ni perder elementos.
+    """
+
+    def leer(self, **kwargs):
+        from exams.packages import read_package
+
+        return read_package(zip_avacom(**kwargs))
+
+    def test_se_detecta_por_su_descriptor(self):
+        from exams.packages import detect_format
+
+        formato, tipo, ref = detect_format(zip_avacom(
+            taxonomia=TAX_BASE,
+            elementos=[("doc", "1", "documento", "La función lineal", "var-t1", None, "h1", "vigente")],
+        ))
+        self.assertEqual(formato, "avacom_contenido")
+        self.assertEqual(tipo, "avacom")
+        self.assertTrue(ref.endswith("formato.json"))
+
+    def test_las_secciones_son_los_hijos_de_la_raiz(self):
+        """Una raíz única es un envoltorio: «Matemáticas» no es una sección útil."""
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[("doc", "1", "documento", "La función lineal", "var-t1", None, "h1", "vigente")],
+        )
+        self.assertEqual([s["titulo"] for s in leido["secciones"]],
+                         ["Pensamiento variacional"])
+
+    def test_una_seccion_sin_contenido_no_se_crea(self):
+        """«Pensamiento numérico» existe en la taxonomía pero no lleva nada."""
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[("doc", "1", "documento", "Doc", "var-t1", None, "h1", "vigente")],
+        )
+        self.assertNotIn("Pensamiento numérico", [s["titulo"] for s in leido["secciones"]])
+
+    def test_la_leccion_hereda_el_codigo_del_marco_curricular(self):
+        """DBA en Colombia, estándar, aprendizaje: el código lo pone el contenido."""
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[("doc", "1", "documento", "Doc", "var-t1", None, "h1", "vigente")],
+        )
+        leccion = leido["secciones"][0]["lessons"][0]
+        self.assertEqual(leccion["competency_framework"], "DBA-8-05")
+
+    def test_una_leccion_expande_su_lista_en_orden(self):
+        """
+        Un elemento de tipo «leccion» es una lista de reproducción: no se importa
+        como ítem, se sustituye por lo que enumera y en su orden.
+        """
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[
+                ("lec", "1", "leccion", "Función lineal y razón de cambio", "var-e1", None, None, "vigente"),
+                ("doc", "1", "documento", "La función lineal", "var-t1", None, "h1", "vigente"),
+                ("vid", "1", "video", "La pendiente", "var-t1", 180, "h2", "vigente"),
+            ],
+            listas=[("lec", 1, "vid"), ("lec", 2, "doc")],
+        )
+        por_titulo = {l["titulo"]: l for s in leido["secciones"] for l in s["lessons"]}
+        items = por_titulo["Identifico relaciones"]["items"]
+        self.assertEqual([i["content_ref"] for i in items], ["avacom:vid", "avacom:doc"])
+        self.assertNotIn("avacom:lec", [i.get("content_ref") for i in items])
+
+    def test_la_lista_no_repite_lo_que_ya_esta_en_la_leccion(self):
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[
+                ("doc", "1", "documento", "Doc", "var-e1", None, "h1", "vigente"),
+                ("lec", "1", "leccion", "Lista", "var-e1", None, None, "vigente"),
+            ],
+            listas=[("lec", 1, "doc")],
+        )
+        items = leido["secciones"][0]["lessons"][0]["items"]
+        self.assertEqual(len(items), 1)
+
+    def test_evaluacion_y_actividad_son_actividades_el_resto_recursos(self):
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[
+                ("eval", "1", "evaluacion", "Evaluación", "var-e1", None, None, "vigente"),
+                ("act", "1", "actividad", "Actividad", "var-e1", None, None, "vigente"),
+                ("doc", "1", "documento", "Doc", "var-t1", None, "h1", "vigente"),
+                ("vid", "1", "video", "Video", "var-t1", 90, "h2", "vigente"),
+                ("aud", "1", "audio", "Audio", "var-t1", 30, "h3", "vigente"),
+            ],
+        )
+        self.assertEqual(leido["conteos"]["actividades"], 2)
+        self.assertEqual(leido["conteos"]["recursos"], 3)
+        tipos = {r["titulo"]: r["content_type"] for r in leido["recursos"]}
+        self.assertEqual(tipos["Video"], "video")
+        self.assertEqual(tipos["Audio"], "audio")
+        self.assertEqual(tipos["Doc"], "reading")
+        # La evaluación se marca como quiz; la actividad, como entrega.
+        tipos_act = {a["titulo"]: a["activity_type"] for a in leido["actividades"]}
+        self.assertEqual(tipos_act["Evaluación"], "quiz")
+        self.assertEqual(tipos_act["Actividad"], "assignment")
+
+    def test_la_actividad_dice_cuantas_preguntas_no_se_importaron(self):
+        """
+        El manifiesto trae enunciado y clave de respuesta pero NO los
+        distractores, así que no alcanza para armar un cuestionario. Se dice el
+        número en vez de callarlo.
+        """
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[("eval", "1", "evaluacion", "Evaluación", "var-e1", None, None, "vigente")],
+            preguntas=[
+                ("q1", "eval", 1, "opcion_multiple", "¿Pendiente de y=3x-5?", "3", "1"),
+                ("q2", "eval", 2, "numerica", "Corte con el eje y", "7", "1"),
+            ],
+        )
+        descripcion = leido["actividades"][0]["descripcion"]
+        self.assertIn("2 pregunta(s)", descripcion)
+        self.assertIn("no se importaron", descripcion)
+
+    def test_un_elemento_retirado_no_entra(self):
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[
+                ("doc", "1", "documento", "Vigente", "var-t1", None, "h1", "vigente"),
+                ("old", "1", "documento", "Retirado", "var-t1", None, "h2", "retirado"),
+            ],
+        )
+        self.assertEqual([r["titulo"] for r in leido["recursos"]], ["Vigente"])
+
+    def test_lo_que_no_cuelga_de_la_taxonomia_no_se_pierde(self):
+        leido = self.leer(
+            taxonomia=TAX_BASE,
+            elementos=[
+                ("doc", "1", "documento", "Clasificado", "var-t1", None, "h1", "vigente"),
+                ("libre", "1", "documento", "Sin nodo", None, None, "h2", "vigente"),
+            ],
+        )
+        titulos = [s["titulo"] for s in leido["secciones"]]
+        self.assertIn("Sin clasificar", titulos)
+        sueltos = next(s for s in leido["secciones"] if s["titulo"] == "Sin clasificar")
+        self.assertEqual(len(sueltos["lessons"][0]["items"]), 1)
+
+    def test_un_paquete_publicado_dice_que_le_falta_la_licencia(self):
+        """
+        Publicar cifra el manifiesto entero. No se puede leer aquí, y el mensaje
+        tiene que decir POR QUÉ y qué hacer, no solo que falló.
+        """
+        from exams.packages import PackageFormatError, read_package
+
+        with self.assertRaises(PackageFormatError) as capturado:
+            read_package(zip_avacom(cifrado=True))
+        mensaje = str(capturado.exception)
+        self.assertIn("licencia", mensaje)
+        self.assertIn("en claro", mensaje)
+        # La vitrina es lo único legible sin licencia: se usa para orientar.
+        self.assertIn("Matemáticas", mensaje)
+
+    def test_un_paquete_sin_elementos_se_rechaza(self):
+        from exams.packages import PackageFormatError
+
+        with self.assertRaises(PackageFormatError):
+            self.leer(taxonomia=TAX_BASE, elementos=[])
+
+    def test_el_zip_puede_venir_sin_carpeta_raiz(self):
+        """Comprimido desde dentro de la carpeta del paquete."""
+        leido = self.leer(
+            carpeta="",
+            taxonomia=TAX_BASE,
+            elementos=[("doc", "1", "documento", "Doc", "var-t1", None, "h1", "vigente")],
+        )
+        self.assertEqual(leido["manifest_ref"], "formato.json")
+
+
+class AvacomContenidoInstalacionTests(TestCase):
+    """El paquete AVACOM entra por el MISMO endpoint que SCORM y CMI5."""
+
+    def setUp(self):
+        from exams.models import CurriculumFramework
+
+        CurriculumFramework.objects.get_or_create(
+            clave="MEN_CO", defaults={"nombre": "MEN Colombia", "pais": "CO", "orden": 1}
+        )
+        self.url = reverse("package-zip-install")
+        self.zip = zip_avacom(
+            titulo="Matemáticas · Grado 8",
+            taxonomia=TAX_BASE,
+            elementos=[
+                ("lec", "1", "leccion", "Función lineal y razón de cambio", "var-e1", None, None, "vigente"),
+                ("doc", "1", "documento", "La función lineal", "var-t1", None, "h1", "vigente"),
+                ("vid", "1", "video", "La pendiente", "var-t1", 180, "h2", "vigente"),
+                ("eval", "1", "evaluacion", "Evaluación", "var-e1", None, None, "vigente"),
+            ],
+            listas=[("lec", 1, "doc"), ("lec", 2, "vid")],
+        )
+
+    def test_la_vista_previa_lo_reconoce(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("paquete.zip", self.zip, content_type="application/zip")
+        respuesta = self.client.post(f"{self.url}?preview=1", {"package": archivo})
+        self.assertEqual(respuesta.status_code, 200, respuesta.content)
+        detectado = respuesta.json()["detected"]
+        self.assertEqual(detectado["content_format"], "avacom_contenido")
+        self.assertEqual(detectado["manifest_type"], "avacom")
+        self.assertEqual(detectado["detected_title"], "Matemáticas · Grado 8")
+        self.assertEqual(detectado["package_identifier"], "co-prueba-avacom")
+
+    def test_se_instala_y_queda_en_m05_curso_host(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("paquete.zip", self.zip, content_type="application/zip")
+        respuesta = self.client.post(self.url, {
+            "package": archivo, "host_id": HOST,
+            "titulo": "Matemáticas 8 · AVACOM", "curriculum_framework": "MEN_CO",
+        })
+        self.assertEqual(respuesta.status_code, 201, respuesta.content)
+        fila = respuesta.json()["host"]
+        self.assertEqual(fila["formato_contenido"], "avacom_contenido")
+        self.assertEqual(fila["formato_legible"], "AVACOM-Contenido")
+        self.assertTrue(fila["presente_local"])
+        self.assertTrue(fila["disponible_estudiante"])
+
+        curso = Course.objects.get(pk=fila["curso"])
+        self.assertEqual(curso.titulo, "Matemáticas 8 · AVACOM")
+        lecciones = Lesson.objects.filter(
+            seccion__curso_version_id=curso.version_activa_id).order_by("orden")
+        self.assertTrue(lecciones.exists())
+        # El código del DBA llega hasta la lección instalada.
+        self.assertIn("DBA-8-05", [l.competency_framework for l in lecciones])
+
+    def test_reimportarlo_es_idempotente(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        def instalar():
+            archivo = SimpleUploadedFile("paquete.zip", self.zip, content_type="application/zip")
+            return self.client.post(self.url, {
+                "package": archivo, "host_id": HOST,
+                "titulo": "Matemáticas 8 · AVACOM", "curriculum_framework": "MEN_CO",
+            })
+
+        primera = instalar()
+        self.assertEqual(primera.status_code, 201, primera.content)
+
+        # La segunda no crea nada, y por eso responde 200 y no 201.
+        segunda = instalar()
+        self.assertEqual(segunda.status_code, 200, segunda.content)
+        self.assertTrue(segunda.json()["install"]["idempotente"])
+        respuesta = segunda
+        self.assertEqual(respuesta.json()["install"]["creados"]["items"], 0)
+        self.assertEqual(CourseHost.objects.filter(host_id=HOST).count(), 1)
+
+    def test_un_paquete_cifrado_se_rechaza_con_400_y_explica(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        archivo = SimpleUploadedFile("pub.zip", zip_avacom(cifrado=True),
+                                     content_type="application/zip")
+        respuesta = self.client.post(f"{self.url}?preview=1", {"package": archivo})
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("licencia", respuesta.json()["detail"])

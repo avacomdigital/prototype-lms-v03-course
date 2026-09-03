@@ -31,6 +31,17 @@ public sealed class CoursesViewModel : ViewModelBase
     }
 
     public ObservableCollection<Course> Courses { get; } = [];
+
+    /// <summary>
+    /// Lo que el docente acaba de repartir desde la pantalla del aula.
+    ///
+    /// No sale del catálogo de la biblioteca: sale del REPARTO. La tableta nunca
+    /// habla con el componente de contenido —solo escucha en 127.0.0.1 del
+    /// equipo maestro— así que pide al backend, y el backend decide.
+    /// </summary>
+    public ObservableCollection<MaterialParaEstudiante> MaterialDeClase { get; } = [];
+
+    public bool HayMaterialDeClase => MaterialDeClase.Count > 0;
     public string StudentName => _session.StudentName;
     public string ConnectionLabel => $"Conectado a {_session.ServerAddress}";
     public string Status { get => _status; private set => Set(ref _status, value); }
@@ -98,6 +109,7 @@ public sealed class CoursesViewModel : ViewModelBase
         try
         {
             var cursos = await _api.GetCoursesAsync(studentCatalog: true);
+            await RefrescarMaterialAsync();
             var cambio = !MismosCursos(cursos);
             _session.Courses = cursos;
 
@@ -117,6 +129,49 @@ public sealed class CoursesViewModel : ViewModelBase
                 Status = $"Sin respuesta de la OPS; esta lista puede estar desactualizada. {exception.Message}";
         }
         finally { if (!silencioso) IsBusy = false; }
+    }
+
+    /// <summary>
+    /// El material repartido a la clase. Si la biblioteca del aula no está, o el
+    /// docente retiró el paquete, el material sigue apareciendo marcado como no
+    /// disponible en vez de desvanecerse: un alumno merece saber por qué no
+    /// puede abrir algo que hace un minuto estaba.
+    /// </summary>
+    private async Task RefrescarMaterialAsync()
+    {
+        try
+        {
+            var reparto = await _api.GetContenidoEstudianteAsync(_session.PersonId, HostDelAula);
+            var igual = reparto.Items.Count == MaterialDeClase.Count
+                && reparto.Items.Select(m => $"{m.Reference}:{m.Available}")
+                    .SequenceEqual(MaterialDeClase.Select(m => $"{m.Reference}:{m.Available}"));
+            if (igual) return;
+
+            MaterialDeClase.Clear();
+            foreach (var material in reparto.Items) MaterialDeClase.Add(material);
+            Notify(nameof(HayMaterialDeClase));
+        }
+        catch (Exception)
+        {
+            // Que no haya reparto no es un fallo del que avisar al alumno: la
+            // mayoría de las clases no reparten nada. El resto de la pantalla
+            // sigue igual.
+        }
+    }
+
+    /// <summary>
+    /// El equipo del aula que sirve a esta tableta. En el prototipo es el mismo
+    /// que atiende la API, que es la única OPS que la tableta conoce.
+    /// </summary>
+    private string HostDelAula
+    {
+        get
+        {
+            var direccion = _session.ServerAddress;
+            if (string.IsNullOrWhiteSpace(direccion)) return "OPS-LOCAL";
+            var conEsquema = direccion.StartsWith("http") ? direccion : $"http://{direccion}";
+            return Uri.TryCreate(conEsquema, UriKind.Absolute, out var uri) ? uri.Host : "OPS-LOCAL";
+        }
     }
 
     private bool MismosCursos(IReadOnlyList<Course> cursos) =>

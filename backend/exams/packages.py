@@ -1,39 +1,67 @@
 """
-Lectura de paquetes de curso: SCORM y CMI5.
+Lectura de paquetes de curso: SCORM, CMI5 y AVACOM-Contenido.
 
-El punto de todo este módulo es que SCORM y CMI5 son formatos de ENTRADA, no
-modelos distintos de curso. Cada parser produce la MISMA estructura intermedia
-—el mismo dict que ya consume exams.package_install— y de ahí en adelante el
-resto del sistema no sabe de qué formato venía:
+El punto de todo este módulo es que los tres son formatos de ENTRADA, no modelos
+distintos de curso. Cada parser produce la MISMA estructura intermedia —el mismo
+dict que ya consume exams.package_install— y de ahí en adelante el resto del
+sistema no sabe de qué formato venía:
 
     .zip
       │
-      ├── imsmanifest.xml ──> parser SCORM ──┐
-      └── cmi5.xml ────────> parser CMI5  ──┤
-                                             ▼
+      ├── imsmanifest.xml ──> parser SCORM ───┐
+      ├── cmi5.xml ────────> parser CMI5  ───┤
+      └── formato.json  ───> parser AVACOM ──┤
+          + manifiesto.db                     ▼
                               avacom-course-package/v1
-                                             │
-                                             ▼
+                                              │
+                                              ▼
                        curso -> sección -> lección -> lesson item
 
 Fuera de alcance a propósito (§23 del spec): las reglas de sequencing de SCORM
 2004, el LRS de CMI5, xAPI, y los detalles de runtime de las AU (moveOn,
 masteryScore, launchMethod). Aquí solo se lee la ESTRUCTURA.
+
+Del formato AVACOM tampoco se lee el runtime: los medios cifrados, la licencia
+por nodo y el visor son del componente de biblioteca, que es otro producto. Acá
+se lee el catálogo del manifiesto para construir el árbol del curso.
 """
 
 import hashlib
 import io
+import json
 import posixpath
 import re
+import sqlite3
+import tempfile
 import zipfile
 from xml.etree import ElementTree
 
 FORMATO_SCORM_12 = "scorm_12"
 FORMATO_SCORM_2004 = "scorm_2004"
 FORMATO_CMI5 = "cmi5"
+FORMATO_AVACOM_CONTENIDO = "avacom_contenido"
 
 MANIFIESTO_SCORM = "imsmanifest.xml"
 MANIFIESTO_CMI5 = "cmi5.xml"
+# El descriptor de AVACOM-Contenido. Va junto a manifiesto.db (paquete en claro)
+# o manifiesto.enc (paquete publicado, cifrado).
+DESCRIPTOR_AVACOM = "formato.json"
+MANIFIESTO_AVACOM = "manifiesto.db"
+MANIFIESTO_AVACOM_CIFRADO = "manifiesto.enc"
+
+# Los tipos de elemento que el formato AVACOM admite, repartidos según lo que
+# son para el LMS. Una evaluación o una actividad se LANZA y se califica; lo
+# demás se abre y se lee, se ve o se escucha.
+AVACOM_TIPOS_ACTIVIDAD = {"actividad", "evaluacion"}
+AVACOM_TIPOS_POR_CONTENIDO = {
+    "video": "video",
+    "audio": "audio",
+    "documento": "reading",
+    "imagen": "reading",
+    "interactivo": "reading",
+    "scorm": "reading",
+    "leccion": "reading",
+}
 
 # Extensiones que deciden si un recurso es lectura, video o audio. El modelo solo
 # admite esos tres valores en content_type.
@@ -104,6 +132,17 @@ def detect_format(datos_zip):
             if posixpath.basename(nombre).lower() == objetivo:
                 return nombre
         return None
+
+    # AVACOM primero: formato.json junto a un manifiesto es inequívoco, y el
+    # .zip de un interactivo viaja dentro de medios/ sin desempaquetar, así que
+    # no puede confundirse con un SCORM.
+    ruta_avacom = buscar(DESCRIPTOR_AVACOM)
+    if ruta_avacom:
+        carpeta = posixpath.dirname(ruta_avacom)
+        claro = posixpath.join(carpeta, MANIFIESTO_AVACOM) if carpeta else MANIFIESTO_AVACOM
+        cifrado = posixpath.join(carpeta, MANIFIESTO_AVACOM_CIFRADO) if carpeta else MANIFIESTO_AVACOM_CIFRADO
+        if claro in nombres or cifrado in nombres:
+            return FORMATO_AVACOM_CONTENIDO, "avacom", ruta_avacom
 
     ruta_cmi5 = buscar(MANIFIESTO_CMI5)
     if ruta_cmi5:
@@ -507,6 +546,342 @@ def _item_desde_au(au, orden, actividades):
     return {"orden": orden, "tipo": "actividad", "activity_ref": logico, "activity_version": 1}
 
 
+# ── AVACOM-Contenido ─────────────────────────────────────────────────────────
+def _parse_avacom(datos_zip, ruta_descriptor):
+    """
+    Un paquete AVACOM-Contenido -> estructura intermedia.
+
+    El paquete es una carpeta comprimida:
+
+        formato.json      descriptor: clave, versión, emisor, firma
+        manifiesto.db     catálogo en SQLite  (paquete EN CLARO)
+        manifiesto.enc    el mismo, cifrado   (paquete PUBLICADO)
+        medios/           archivos nombrados por su huella
+
+    El catálogo trae una taxonomía de profundidad libre —preescolar usa
+    propósito / actividad rectora / experiencia / aprendizaje, secundaria usa
+    área / pensamiento / estándar / tema— y el árbol del LMS tiene exactamente
+    dos niveles. La regla para aplanarla:
+
+        · SECCIÓN  los hijos de la raíz. Si hay varias raíces, las raíces.
+                   Una sección sin lecciones no se crea.
+        · LECCIÓN  todo nodo de la taxonomía que lleve elementos, colgado de la
+                   sección que sea su ancestro.
+        · ÍTEM     los elementos de ese nodo. Un elemento de tipo «leccion» es
+                   una lista de reproducción: se expande en su sitio con el
+                   orden que declara p_leccion_item.
+
+    Las preguntas de las evaluaciones NO se importan. El manifiesto trae el
+    enunciado y la clave de respuesta pero no los distractores, así que no
+    alcanza para armar un cuestionario contestable; la actividad sí se crea, y
+    su descripción dice cuántas preguntas trae el original.
+    """
+    with zipfile.ZipFile(io.BytesIO(datos_zip)) as zf:
+        nombres = zf.namelist()
+        carpeta = posixpath.dirname(ruta_descriptor)
+
+        def dentro(nombre):
+            return posixpath.join(carpeta, nombre) if carpeta else nombre
+
+        try:
+            descriptor = json.loads(zf.read(ruta_descriptor).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise PackageFormatError("El formato.json del paquete no se puede leer.") from exc
+
+        ruta_manifiesto = dentro(MANIFIESTO_AVACOM)
+        if ruta_manifiesto not in nombres:
+            if dentro(MANIFIESTO_AVACOM_CIFRADO) in nombres:
+                raise PackageFormatError(_aviso_cifrado(descriptor))
+            raise PackageFormatError(
+                "El paquete AVACOM no trae manifiesto.db junto a su formato.json."
+            )
+        bytes_manifiesto = zf.read(ruta_manifiesto)
+
+    paquete, taxonomia, elementos, listas, preguntas = _leer_manifiesto(bytes_manifiesto)
+
+    recursos = {}
+    actividades = {}
+    secciones = _aplanar_taxonomia(
+        taxonomia, elementos, listas, preguntas, recursos, actividades
+    )
+    if not secciones:
+        raise PackageFormatError(
+            "El manifiesto no tiene ningún elemento colgado de su taxonomía: "
+            "no hay nada que instalar."
+        )
+
+    return {
+        "titulo_curso": paquete.get("titulo") or paquete["clave_paquete"],
+        "formato_contenido": FORMATO_AVACOM_CONTENIDO,
+        "manifest_tipo": "avacom",
+        "manifest_ref": ruta_descriptor,
+        "package_identifier": paquete["clave_paquete"],
+        "package_version": str(paquete.get("version") or "1"),
+        "scorm_organization_id": None,
+        "recursos": list(recursos.values()),
+        "actividades": list(actividades.values()),
+        "secciones": secciones,
+    }
+
+
+def _aviso_cifrado(descriptor):
+    """
+    Un paquete publicado va cifrado, manifiesto incluido, y no se puede leer
+    aquí. Lo único legible sin licencia es la vitrina, así que el mensaje la usa
+    para que el docente sepa qué tiene en la mano y qué le falta.
+    """
+    vitrina = descriptor.get("vitrina") or {}
+    trozos = [
+        vitrina.get("titulo"),
+        vitrina.get("pais"),
+        vitrina.get("nivel_clave"),
+        f"grado {vitrina['grado']}" if vitrina.get("grado") else None,
+        vitrina.get("asignatura"),
+    ]
+    descrito = " · ".join(t for t in trozos if t) or descriptor.get("clave_paquete", "")
+    return (
+        f"Este paquete AVACOM está publicado y va cifrado ({descrito}). "
+        "Su manifiesto solo se abre con la licencia del equipo que lo va a usar, "
+        "y esta OPS no la tiene. Importa el paquete en claro —el que produce la "
+        "etapa de construir, antes de publicar— o provisiona la licencia de este "
+        "equipo."
+    )
+
+
+def _leer_manifiesto(datos):
+    """
+    Abre el manifiesto.db en memoria y devuelve sus tablas.
+
+    Se usa deserialize para no escribir el catálogo en disco. El propio formato
+    insiste en eso porque el manifiesto lleva las claves de respuesta; aunque
+    aquí no se importen, no hay motivo para dejarlas en un temporal.
+    """
+    conexion = sqlite3.connect(":memory:")
+    conexion.row_factory = sqlite3.Row
+    try:
+        try:
+            conexion.deserialize(datos)
+        except AttributeError:
+            # Python sin deserialize: se cae a un temporal, que se borra enseguida.
+            conexion.close()
+            return _leer_manifiesto_en_disco(datos)
+        except sqlite3.Error as exc:
+            raise PackageFormatError("El manifiesto.db del paquete no es una base válida.") from exc
+        return _volcar_manifiesto(conexion)
+    finally:
+        conexion.close()
+
+
+def _leer_manifiesto_en_disco(datos):
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temporal:
+        temporal.write(datos)
+        ruta = temporal.name
+    try:
+        conexion = sqlite3.connect(ruta)
+        conexion.row_factory = sqlite3.Row
+        try:
+            return _volcar_manifiesto(conexion)
+        finally:
+            conexion.close()
+    finally:
+        import os
+
+        try:
+            os.unlink(ruta)
+        except OSError:
+            pass
+
+
+def _volcar_manifiesto(conexion):
+    try:
+        fila = conexion.execute("SELECT * FROM p_paquete").fetchone()
+    except sqlite3.Error as exc:
+        raise PackageFormatError(
+            "El manifiesto.db no tiene la tabla p_paquete: no es un paquete AVACOM."
+        ) from exc
+    if fila is None:
+        raise PackageFormatError("El manifiesto.db no declara ningún paquete.")
+
+    paquete = dict(fila)
+    taxonomia = [dict(r) for r in conexion.execute(
+        "SELECT * FROM p_taxonomia ORDER BY orden, nombre")]
+    elementos = [dict(r) for r in conexion.execute(
+        "SELECT * FROM p_elemento WHERE estado = 'vigente' ORDER BY rowid")]
+
+    listas = {}
+    for r in conexion.execute("SELECT * FROM p_leccion_item ORDER BY elemento_ref, orden"):
+        listas.setdefault(r["elemento_ref"], []).append(r["item_ref"])
+
+    preguntas = {}
+    for r in conexion.execute("SELECT elemento_ref, count(*) AS n FROM p_pregunta "
+                              "GROUP BY elemento_ref"):
+        preguntas[r["elemento_ref"]] = r["n"]
+
+    return paquete, taxonomia, elementos, listas, preguntas
+
+
+def _aplanar_taxonomia(taxonomia, elementos, listas, preguntas, recursos, actividades):
+    """La regla de dos niveles descrita en _parse_avacom."""
+    por_ref = {t["taxonomia_ref"]: t for t in taxonomia}
+    hijos = {}
+    for nodo in taxonomia:
+        hijos.setdefault(nodo.get("padre_ref"), []).append(nodo)
+
+    elementos_por_ref = {e["elemento_ref"]: e for e in elementos}
+    por_nodo = {}
+    sueltos = []
+    for elemento in elementos:
+        ref = elemento.get("taxonomia_ref")
+        if ref and ref in por_ref:
+            por_nodo.setdefault(ref, []).append(elemento)
+        else:
+            sueltos.append(elemento)
+
+    raices = sorted(hijos.get(None, []), key=lambda n: (n["orden"], n["nombre"]))
+    # Una sola raíz suele ser un envoltorio —el área, el propósito— y no dice
+    # nada por sí misma: las secciones útiles son sus hijos.
+    if len(raices) == 1 and hijos.get(raices[0]["taxonomia_ref"]):
+        cabezas = sorted(hijos[raices[0]["taxonomia_ref"]], key=lambda n: (n["orden"], n["nombre"]))
+    else:
+        cabezas = raices
+
+    def rama(nodo):
+        """El nodo y todos sus descendientes, en orden de recorrido."""
+        salida = [nodo]
+        for hijo in sorted(hijos.get(nodo["taxonomia_ref"], []), key=lambda n: (n["orden"], n["nombre"])):
+            salida.extend(rama(hijo))
+        return salida
+
+    secciones = []
+    for orden_seccion, cabeza in enumerate(cabezas, start=1):
+        lecciones = []
+        for nodo in rama(cabeza):
+            propios = por_nodo.get(nodo["taxonomia_ref"])
+            if not propios:
+                continue
+            items = _items_de(propios, elementos_por_ref, listas, preguntas, recursos, actividades)
+            if not items:
+                continue
+            lecciones.append(_leccion(nodo["taxonomia_ref"], nodo["nombre"],
+                                      len(lecciones) + 1, items, nodo.get("codigo")))
+        if lecciones:
+            secciones.append({
+                "codigo": _slug(cabeza["taxonomia_ref"], "section"),
+                "titulo": (cabeza["nombre"] or "Sección")[:250],
+                "orden": len(secciones) + 1,
+                "lessons": lecciones,
+            })
+
+    # Elementos sin taxonomía válida: no se pierden, van a su propia sección.
+    if sueltos:
+        items = _items_de(sueltos, elementos_por_ref, listas, preguntas, recursos, actividades)
+        if items:
+            secciones.append({
+                "codigo": "section.sin-clasificar",
+                "titulo": "Sin clasificar",
+                "orden": len(secciones) + 1,
+                "lessons": [_leccion("sin-clasificar", "Material sin clasificar", 1, items)],
+            })
+
+    return secciones
+
+
+def _leccion(referencia, titulo, orden, items, codigo_taxonomia=None):
+    return {
+        "codigo": _slug(referencia, "lesson"),
+        "titulo": (titulo or "Lección")[:250],
+        "descripcion": None,
+        # El código del nodo de la taxonomía es lo que el marco curricular usa
+        # para nombrarse: un DBA en Colombia, un estándar, un aprendizaje.
+        "competency_framework": (codigo_taxonomia or None),
+        "learning_outcome": None,
+        "skills": None,
+        "attitudes_values": None,
+        "orden": orden,
+        "estado": "publicado",
+        "items": items,
+    }
+
+
+def _items_de(propios, elementos_por_ref, listas, preguntas, recursos, actividades):
+    """
+    Los ítems de una lección, con las listas de reproducción ya expandidas.
+
+    Un elemento de tipo «leccion» no se importa como ítem: se sustituye por lo
+    que enumera, en su orden. Si algo ya está en la misma lección no se repite.
+    """
+    vistos = set()
+    items = []
+
+    def agregar(elemento):
+        referencia = elemento["elemento_ref"]
+        if referencia in vistos:
+            return
+        vistos.add(referencia)
+        items.append(_item_avacom(elemento, len(items) + 1, preguntas, recursos, actividades))
+
+    for elemento in propios:
+        if elemento["tipo"] == "leccion":
+            for referencia in listas.get(elemento["elemento_ref"], []):
+                enumerado = elementos_por_ref.get(referencia)
+                if enumerado is not None:
+                    agregar(enumerado)
+        else:
+            agregar(elemento)
+    return items
+
+
+def _item_avacom(elemento, orden, preguntas, recursos, actividades):
+    referencia = elemento["elemento_ref"]
+    logico = f"avacom:{referencia}"
+    titulo = (elemento.get("titulo") or referencia)[:250]
+
+    if elemento["tipo"] in AVACOM_TIPOS_ACTIVIDAD:
+        cuantas = preguntas.get(referencia, 0)
+        partes = [f"{elemento['tipo'].capitalize()} de un paquete AVACOM-Contenido"]
+        if cuantas:
+            # Se dice el número para que se note que las preguntas existen en el
+            # origen y que lo que falta para armarlas son los distractores.
+            partes.append(
+                f"{cuantas} pregunta(s) en el manifiesto; el formato no trae las "
+                "opciones, así que no se importaron"
+            )
+        if elemento.get("accesibilidad"):
+            partes.append(str(elemento["accesibilidad"]))
+        actividades[logico] = {
+            "id": None,
+            "activity_ref": logico,
+            "version": 1,
+            "titulo": titulo,
+            "descripcion": " · ".join(partes)[:500],
+            "activity_type": "quiz" if elemento["tipo"] == "evaluacion" else "assignment",
+            "submission_type": "none",
+            "grading_type": "teacher",
+            "max_score": 100,
+            "autor_id": "importador-avacom",
+        }
+        return {"orden": orden, "tipo": "actividad", "activity_ref": logico, "activity_version": 1}
+
+    recursos[logico] = {
+        "id": None,
+        "titulo": titulo,
+        "content_type": AVACOM_TIPOS_POR_CONTENIDO.get(elemento["tipo"], "reading"),
+        "content_ref": logico,
+        "content_version": str(elemento.get("version_elemento") or "1"),
+        # La huella viene del propio manifiesto: es la que nombra el archivo
+        # dentro de medios/, así que sirve para localizarlo después.
+        "content_huella": elemento.get("huella_archivo"),
+        "duracion_seg": elemento.get("duracion_seg"),
+        "autor_id": "importador-avacom",
+    }
+    return {
+        "orden": orden,
+        "tipo": "contenido",
+        "content_ref": logico,
+        "content_version": str(elemento.get("version_elemento") or "1"),
+    }
+
+
 # ── Entrada pública ──────────────────────────────────────────────────────────
 def read_package(datos_zip):
     """
@@ -516,7 +891,9 @@ def read_package(datos_zip):
     formato detectado, identificador, versión y conteos.
     """
     formato, manifest_tipo, manifest_ref = detect_format(datos_zip)
-    if formato == FORMATO_CMI5:
+    if formato == FORMATO_AVACOM_CONTENIDO:
+        leido = _parse_avacom(datos_zip, manifest_ref)
+    elif formato == FORMATO_CMI5:
         leido = _parse_cmi5(datos_zip, manifest_ref)
     else:
         leido = _parse_scorm(datos_zip, manifest_ref, formato)
