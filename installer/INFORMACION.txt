@@ -1,0 +1,44 @@
+AVACOM LMS 2.0
+AVACOM OPS Master
+
+
+Este asistente instalara AVACOM OPS Master y los servicios locales que
+necesita en este equipo.
+
+
+Que se instala
+--------------
+
+  El panel del profesor, la aplicacion que se abre en la pantalla del aula.
+
+  La API local del aula, que atiende a las tabletas de los estudiantes por la
+  red del salon.
+
+Todo lo necesario viaja dentro del instalador. No hace falta conexion a
+internet ni instalar nada antes.
+
+
+Sobre el aula
+-------------
+
+La API queda como un servicio de Windows, asi que las tabletas tienen servicio
+desde que el equipo arranca, incluso antes de que alguien abra el panel.
+
+El instalador pedira permiso a Windows Defender Firewall para que las tabletas
+del salon puedan conectarse. Ese permiso se limita a redes privadas.
+
+
+Si este equipo ya tiene AVACOM Biblioteca
+-----------------------------------------
+
+Los dos productos estan pensados para convivir en el mismo equipo. AVACOM OPS
+Master usa carpetas, configuracion, base de datos, registros, servicio, puerto
+y accesos directos propios, y no modifica ninguno de los de AVACOM Biblioteca.
+
+
+Datos y desinstalacion
+----------------------
+
+La base de datos y los registros se guardan fuera de la carpeta del programa,
+en ProgramData. Al desinstalar se retira el programa y se conserva la base de
+datos: contiene el trabajo de los estudiantes, y perderlo no se deshace.

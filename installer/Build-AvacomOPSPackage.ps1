@@ -9,6 +9,7 @@
       app\        panel del profesor, .exe autocontenido (sin runtime de .NET)
       backend\    la API de Django
       runtime\    Python 3.12.10 embebido con las dependencias ya instaladas
+      service\    AVACOMOPSBackend, el servicio que mantiene la API en marcha
 
     La diferencia con el asistente anterior es que allí el equipo del profesor
     compilaba: descargaba el SDK de .NET, la carga MAUI y Python con winget, y
@@ -49,6 +50,8 @@ $payload       = Join-Path $scriptDir "payload"
 $appDir        = Join-Path $payload "app"
 $backendDir    = Join-Path $payload "backend"
 $runtimeDir    = Join-Path $payload "runtime"
+$serviceDir    = Join-Path $payload "service"
+$serviceProject = Join-Path $RepoRoot "src\Avacom.OPS.Backend.Service\Avacom.OPS.Backend.Service.csproj"
 $masterProject = Join-Path $RepoRoot "src\Avacom.OPS.Master\Avacom.OPS.Master.csproj"
 $backendSource = Join-Path $RepoRoot "backend"
 $workDir       = Join-Path $env:TEMP "avacom-package-work"
@@ -196,8 +199,20 @@ else {
     # las ruedas binarias son específicas de la versión y la arquitectura.
     $builder = Find-BuildPython $PythonVersion $BuildPython
     Write-Host "Instalando requirements.txt en el runtime con $($builder.Path)…"
-    & $builder.Path -m pip install -r (Join-Path $backendDir "requirements.txt") `
-        --target $sitePackages --upgrade --no-warn-script-location --quiet
+
+    # $ErrorActionPreference se relaja SOLO alrededor de pip, y no por descuido.
+    # Windows PowerShell 5.1 envuelve cada línea que un ejecutable nativo manda
+    # a stderr en un ErrorRecord; con la preferencia en Stop, el aviso
+    # "A new release of pip is available" aborta la compilación aunque pip haya
+    # terminado en 0. Lo que decide si el paso funcionó es $LASTEXITCODE, y eso
+    # es lo que comprueba Assert-Native.
+    $preferenciaPrevia = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $builder.Path -m pip install -r (Join-Path $backendDir "requirements.txt") `
+            --target $sitePackages --upgrade --no-warn-script-location --quiet
+    }
+    finally { $ErrorActionPreference = $preferenciaPrevia }
     Assert-Native "Falló la instalación de dependencias en el runtime"
 
     # __pycache__ no viaja: son megas que el instalador no necesita y que se
@@ -210,6 +225,25 @@ else {
 # cambia y dejarla dentro del bloque que se puede saltar significaba reutilizar
 # un ._pth obsoleto sin que nada lo indicara.
 Set-RuntimePath $runtimeDir
+
+# ── 3c. Servicio de Windows del backend ──────────────────────────────────────
+Write-Step "Servicio AVACOMOPSBackend"
+if ($SkipPublish -and (Test-Path (Join-Path $serviceDir "Avacom.OPS.Backend.Service.exe"))) {
+    Write-Host "Se reutiliza el servicio existente en service\"
+}
+else {
+    Remove-Item -Recurse -Force $serviceDir -ErrorAction SilentlyContinue
+    # Autocontenido igual que el panel: el equipo del aula no tiene por qué
+    # tener el runtime de .NET, y un servicio que no arranca por eso deja el
+    # aula sin API sin decir por qué.
+    & dotnet publish $serviceProject -c Release -r win-x64 `
+        --self-contained -p:PublishSingleFile=true `
+        -o $serviceDir --nologo -v q
+    Assert-Native "Falló la publicación del servicio del backend"
+    if (-not (Test-Path (Join-Path $serviceDir "Avacom.OPS.Backend.Service.exe"))) {
+        throw "La publicación terminó pero no apareció Avacom.OPS.Backend.Service.exe"
+    }
+}
 
 # ── 3b. El runtime funciona de verdad ────────────────────────────────────────
 # Un pip que termina en 0 no garantiza nada: lo que decide si el paquete sirve es
@@ -234,7 +268,8 @@ finally { Pop-Location }
 Write-Step "Carga preparada"
 foreach ($part in @(@{N="app";      P=$appDir},
                     @{N="backend";  P=$backendDir},
-                    @{N="runtime";  P=$runtimeDir})) {
+                    @{N="runtime";  P=$runtimeDir},
+                    @{N="service";  P=$serviceDir})) {
     $size = (Get-ChildItem -Path $part.P -Recurse -File -ErrorAction SilentlyContinue |
              Measure-Object -Property Length -Sum).Sum
     Write-Host ("  {0,-10} {1,8:N1} MB" -f $part.N, ($size / 1MB))
@@ -242,4 +277,4 @@ foreach ($part in @(@{N="app";      P=$appDir},
 $total = (Get-ChildItem -Path $payload -Recurse -File | Measure-Object -Property Length -Sum).Sum
 Write-Host ("  {0,-10} {1,8:N1} MB" -f "TOTAL", ($total / 1MB))
 Write-Host ""
-Write-Host "Siguiente paso: compilar el wizard con ISCC.exe installer\AvacomOPSCore.iss" -ForegroundColor Green
+Write-Host "Siguiente paso: compilar el wizard con Build-Installer.ps1" -ForegroundColor Green

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Avacom.OPS.Backend.Service</RootNamespace>
+    <AssemblyName>Avacom.OPS.Backend.Service</AssemblyName>
+    <!-- Autocontenido y de un solo archivo: el equipo del aula no tiene por qué
+         tener el runtime de .NET instalado, y el instalador no debe depender de
+         una descarga. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lo único que se añade: el alojamiento como servicio de Windows. Sin
+         esto habría que recurrir a un envoltorio de terceros (NSSM y
+         parecidos), que es un binario más que alguien tendría que auditar. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
