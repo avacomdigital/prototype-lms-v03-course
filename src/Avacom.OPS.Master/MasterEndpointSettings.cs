@@ -7,7 +7,7 @@ public sealed class MasterEndpointSettings
     private const string Key = "master_api_url";
     private const string HostKey = "master_host_id";
 
-    public string BaseUrl { get => Preferences.Default.Get(Key, "http://27.0.0.1:8000/"); set => Preferences.Default.Set(Key, new ApiEndpoint(value).BaseUrl); }
+    public string BaseUrl { get => Preferences.Default.Get(Key, "http://127.0.0.1:8000/"); set => Preferences.Default.Set(Key, new ApiEndpoint(value).BaseUrl); }
     public ApiEndpoint Current => new(BaseUrl);
 
     /// <summary>
