@@ -180,7 +180,10 @@ if ($faltan.Count -eq 0) {
 # ── Informe ──────────────────────────────────────────────────────────────────
 $carpeta = Split-Path -Parent $Informe
 if ($carpeta -and -not (Test-Path $carpeta)) { New-Item -ItemType Directory -Path $carpeta -Force | Out-Null }
-Set-Content -Path $Informe -Value $lineas -Encoding UTF8
+# ASCII y no UTF8: el asistente lo lee con LoadStringsFromFile, que interpreta
+# ANSI. Escribirlo en ASCII deja las dos partes de acuerdo sin que ninguna tenga
+# que adivinar la codificacion. Por eso los mensajes de arriba van sin acentos.
+Set-Content -Path $Informe -Value $lineas -Encoding ASCII
 
 foreach ($linea in $lineas) { Write-Host $linea }
 if ($hayError) { exit 1 } else { exit 0 }

@@ -71,6 +71,14 @@ DisableWelcomePage=no
 DisableProgramGroupPage=yes
 UninstallDisplayName={#AppName}
 SetupLogging=yes
+; Sin esto el Setup.exe sale SIN version de archivo, y en el Explorador no hay
+; forma de distinguirlo de otro Setup a simple vista. Es exactamente asi como se
+; acabo ejecutando el instalador de la version 1 creyendo que era este.
+VersionInfoVersion={#AppVersion}
+VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoCompany={#AppPublisher}
+VersionInfoDescription=Instalador de {#AppName} ({#AppSuite})
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -112,8 +120,9 @@ Source: "payload\app\*";     DestDir: "{app}\app";     Flags: ignoreversion recu
 Source: "payload\backend\*"; DestDir: "{app}\backend"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Python 3.12 embebido con las dependencias ya instaladas.
 Source: "payload\runtime\*"; DestDir: "{app}\runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
-; El servicio que mantiene la API en marcha.
-Source: "payload\service\*"; DestDir: "{app}\service"; Flags: ignoreversion recursesubdirs createallsubdirs
+; El servicio que mantiene la API en marcha. Los .pdb son simbolos de
+; depuracion: no sirven de nada en el aula y solo abultan el paquete.
+Source: "payload\service\*"; DestDir: "{app}\service"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Los guiones que el asistente ejecuta. Van instalados porque el desinstalador
 ; tambien los necesita.
 Source: "tools\Register-Backend-Service.ps1";   DestDir: "{app}\tools"; Flags: ignoreversion
@@ -222,9 +231,11 @@ begin
     Exit;
   end;
 
-  { El informe lo escribe PowerShell en UTF-8. LoadStringsFromFile asume ANSI
-    y destrozaria cualquier acento; la variante UTF8 existe justo para esto. }
-  if LoadStringsFromUTF8File(Informe, Lineas) then
+  { LoadStringsFromFile lee en ANSI, e Inno no ofrece una variante para leer
+    VARIAS lineas en UTF-8. Por eso el informe se escribe en ASCII puro desde
+    PowerShell y los mensajes de Validate-Node.ps1 van sin acentos: asi las dos
+    partes coinciden y no hay codificacion que adivinar. }
+  if LoadStringsFromFile(Informe, Lineas) then
   begin
     for i := 0 to GetArrayLength(Lineas) - 1 do
     begin
