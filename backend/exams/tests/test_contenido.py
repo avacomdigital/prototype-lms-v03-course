@@ -906,8 +906,12 @@ class ReinstalarQuitaElCartelTests(BaseContenido):
             retirado_en=1_700_000_000_000, creado_por="docente-ops",
         )
 
-    def veredicto(self):
-        respuesta = self.client.get(reverse("curso-contenido", args=[self.curso.id]))
+    def veredicto(self, sanear=False):
+        """
+        El panel pide ?sanear=1; una tableta no. Por defecto esto NO escribe.
+        """
+        url = reverse("curso-contenido", args=[self.curso.id])
+        respuesta = self.client.get(f"{url}?sanear=1" if sanear else url)
         self.assertEqual(respuesta.status_code, 200, respuesta.content)
         return respuesta.json()
 
@@ -930,19 +934,34 @@ class ReinstalarQuitaElCartelTests(BaseContenido):
         self.assertTrue(datos["estructura_visible"])
         self.assertTrue(datos["origen"]["paquete_presente"])
 
-    def test_al_reinstalar_se_sanea_el_registro(self):
+    def test_al_reinstalar_el_panel_sanea_el_registro(self):
         """
         Y la base deja de mentir, que es lo que permite decírselo a la tableta:
         si `presente_local` se quedara en false, el catálogo del estudiante
         seguiría escondiendo el curso.
         """
-        datos = self.veredicto()
+        datos = self.veredicto(sanear=True)
         self.assertFalse(datos["contenido_retirado"])
+        self.assertTrue(datos["registro_desfasado"])
+        self.assertTrue(datos["registro_saneado"])
 
         self.fila.refresh_from_db()
         self.assertTrue(self.fila.presente_local)
         self.assertTrue(self.fila.disponible_estudiante)
         self.assertIsNone(self.fila.retirado_en)
+
+    def test_una_tableta_no_puede_sanear_nada(self):
+        """
+        La misma ruta sin ?sanear=1 informa pero no escribe. Un GET no debe
+        mutar, y menos uno que una tableta puede llamar.
+        """
+        datos = self.veredicto()
+        self.assertFalse(datos["contenido_retirado"])
+        self.assertTrue(datos["registro_desfasado"])
+        self.assertFalse(datos["registro_saneado"])
+
+        self.fila.refresh_from_db()
+        self.assertFalse(self.fila.presente_local)
 
     def test_un_curso_SCORM_no_se_sanea_solo(self):
         """

@@ -65,7 +65,7 @@ CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 AVACOM_HOST_ID = os.environ.get("AVACOM_HOST_ID") or socket.gethostname() or "OPS-LOCAL"
 
 REST_FRAMEWORK = {
-    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_RENDERER_CLASSES": ["exams.renderers.JSONRendererUtf8"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "UNAUTHENTICATED_USER": None,

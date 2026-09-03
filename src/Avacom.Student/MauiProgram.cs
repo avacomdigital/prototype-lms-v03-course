@@ -41,15 +41,11 @@ public static class MauiProgram
 #endif
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<RegistrationViewModel>();
-        builder.Services.AddTransient<CoursesViewModel>();
-        builder.Services.AddTransient<CourseDetailViewModel>();
-        builder.Services.AddTransient<ExamViewModel>();
-        builder.Services.AddTransient<FinishedViewModel>();
         builder.Services.AddTransient<RegistrationPage>();
-        builder.Services.AddTransient<CoursesPage>();
-        builder.Services.AddTransient<CourseDetailPage>();
-        builder.Services.AddTransient<ExamPage>();
-        builder.Services.AddTransient<FinishedPage>();
+        // El resumen es singleton: conserva el curso que el alumno estaba
+        // mirando cuando la pantalla se vuelve a abrir.
+        builder.Services.AddSingleton<ResumenViewModel>();
+        builder.Services.AddSingleton<ResumenPage>();
         return builder.Build();
     }
 }

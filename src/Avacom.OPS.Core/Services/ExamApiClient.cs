@@ -96,6 +96,24 @@ public interface ILmsApiClient
 
     Task<JsonElement> CerrarRepartoAsync(string repartoId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Los cursos del alumno, con su avance y si hoy se pueden abrir.
+    ///
+    /// Sale de la MATRÍCULA: un curso cuyo contenido desapareció sigue llegando,
+    /// en `unavailable`, con su progreso intacto.
+    /// </summary>
+    Task<CursosDelEstudiante> GetStudentCoursesAsync(
+        string personId, string hostId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Averigua el `host_id` del equipo del aula leyendo m05_curso_host.
+    ///
+    /// La tableta lo necesita para preguntar por los cursos del alumno y no
+    /// tiene otra forma de conocerlo: el nombre del equipo no se deduce de una
+    /// dirección IP. Es de solo lectura; el Student nunca escribe ahí.
+    /// </summary>
+    Task<string?> DiscoverHostIdAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Lo que una tableta puede abrir ahora. Sale del reparto, no del catálogo.</summary>
     Task<ContenidoParaEstudiante> GetContenidoEstudianteAsync(
         string personId, string hostId, CancellationToken cancellationToken = default);
@@ -367,8 +385,11 @@ public sealed class LmsApiClient(HttpClient httpClient) : ILmsApiClient
             new { host_id = hostId, actor = "docente-ops" }, cancellationToken);
 
     public Task<CursoContenido> GetCursoContenidoAsync(string courseId, CancellationToken cancellationToken = default) =>
+        // ?sanear=1 · el panel arregla el registro desfasado al pasar. Las
+        // tabletas llaman a la misma ruta SIN ese parámetro, así que no pueden
+        // tocar las banderas de presencia.
         GetAsync<CursoContenido>(
-            $"api/courses/{Uri.EscapeDataString(courseId)}/contenido/", cancellationToken);
+            $"api/courses/{Uri.EscapeDataString(courseId)}/contenido/?sanear=1", cancellationToken);
 
     public Task<InformeDeContenido> GetInformeContenidoAsync(CancellationToken cancellationToken = default) =>
         GetAsync<InformeDeContenido>("api/contenido/reconciliar/", cancellationToken);
@@ -411,6 +432,21 @@ public sealed class LmsApiClient(HttpClient httpClient) : ILmsApiClient
     public Task<JsonElement> CerrarRepartoAsync(string repartoId, CancellationToken cancellationToken = default) =>
         PostAsync<JsonElement>(
             $"api/contenido/reparto/{Uri.EscapeDataString(repartoId)}/cerrar/", new { }, cancellationToken);
+
+    public Task<CursosDelEstudiante> GetStudentCoursesAsync(
+        string personId, string hostId, CancellationToken cancellationToken = default) =>
+        GetAsync<CursosDelEstudiante>(
+            $"api/students/{Uri.EscapeDataString(personId)}/courses/?host_id={Uri.EscapeDataString(hostId)}",
+            cancellationToken);
+
+    public async Task<string?> DiscoverHostIdAsync(CancellationToken cancellationToken = default)
+    {
+        var filas = await GetAsync<List<FilaDeHost>>("api/course-hosts/", cancellationToken);
+        // Un aula tiene un equipo maestro. Si hubiera varias filas de hosts
+        // distintos, gana la que esté presente: es la que sirve contenido hoy.
+        return filas.FirstOrDefault(f => f.PresentLocally)?.HostId
+            ?? filas.FirstOrDefault()?.HostId;
+    }
 
     public Task<ContenidoParaEstudiante> GetContenidoEstudianteAsync(
         string personId, string hostId, CancellationToken cancellationToken = default) =>

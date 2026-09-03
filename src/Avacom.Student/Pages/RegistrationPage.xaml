@@ -4,47 +4,94 @@
              xmlns:vm="clr-namespace:Avacom.Student.ViewModels"
              x:Class="Avacom.Student.Pages.RegistrationPage"
              x:DataType="vm:RegistrationViewModel"
-             Background="{StaticResource PageGradient}">
+             Background="{StaticResource PageGradient}"
+             Shell.NavBarIsVisible="False">
     <ScrollView>
-        <Grid Padding="{OnIdiom Desktop=48, Tablet=32, Phone=18}" MinimumHeightRequest="{OnIdiom Desktop=720, Tablet=650, Phone=620}">
-            <Grid MaximumWidthRequest="1080" HorizontalOptions="Center" VerticalOptions="Center"
-                  ColumnDefinitions="{OnIdiom Desktop='1.05*,0.95*', Tablet='1.05*,0.95*', Phone='*'}"
-                  RowDefinitions="{OnIdiom Desktop='*', Tablet='*', Phone='Auto,Auto'}"
-                  ColumnSpacing="30" RowSpacing="22">
-                <VerticalStackLayout Padding="{OnIdiom Desktop='20,10,30,10', Tablet='8,10,20,10', Phone='4,4'}" Spacing="20" VerticalOptions="Center">
-                    <Image Source="avacom_logo.png" HeightRequest="{OnIdiom Desktop=58, Tablet=52, Phone=44}" HorizontalOptions="Start" Aspect="AspectFit" />
-                    <Border Padding="14,8" BackgroundColor="#DDFDF3" StrokeThickness="0" HorizontalOptions="Start">
-                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
-                        <HorizontalStackLayout Spacing="8"><Ellipse WidthRequest="9" HeightRequest="9" Fill="{StaticResource Success}" VerticalOptions="Center" /><Label Text="AVACOM STUDENT" TextColor="{StaticResource Success}" FontAttributes="Bold" FontSize="11" /></HorizontalStackLayout>
-                    </Border>
-                    <Label Text="Tu aula, lista para aprender." Style="{StaticResource PageTitle}" />
-                    <Label Text="Conéctate al host del profesor y abre tus cursos, lecciones y actividades desde un solo lugar." TextColor="{StaticResource Muted}" FontSize="{OnIdiom Desktop=17, Tablet=16, Phone=15}" MaxLines="4" />
-                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="12">
-                        <Border WidthRequest="42" HeightRequest="42" BackgroundColor="#EDF8FC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="13" /></Border.StrokeShape><Label Text="01" TextColor="{StaticResource Info}" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" /></Border>
-                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center"><Label Text="Conecta con tu nombre" FontAttributes="Bold" /><Label Text="La dirección la comparte el profesor." TextColor="{StaticResource Muted}" FontSize="12" /></VerticalStackLayout>
-                        <Border Grid.Row="1" WidthRequest="42" HeightRequest="42" BackgroundColor="#FDEBEC" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="13" /></Border.StrokeShape><Label Text="02" TextColor="{StaticResource Primary}" FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" /></Border>
-                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" VerticalOptions="Center"><Label Text="Avanza por cada lección" FontAttributes="Bold" /><Label Text="Tu pregunta actual se reporta en vivo." TextColor="{StaticResource Muted}" FontSize="12" /></VerticalStackLayout>
-                    </Grid>
-                </VerticalStackLayout>
+        <Grid Padding="{OnIdiom Desktop=40, Tablet=32, Phone=18}" RowDefinitions="*">
+            <Border Style="{StaticResource SoftCard}" Padding="{OnIdiom Desktop=40, Tablet=34, Phone=22}"
+                    MaximumWidthRequest="620" HorizontalOptions="Center" VerticalOptions="Center">
+                <VerticalStackLayout Spacing="24">
 
-                <Border Grid.Column="{OnIdiom Desktop=1, Tablet=1, Phone=0}" Grid.Row="{OnIdiom Desktop=0, Tablet=0, Phone=1}" Style="{StaticResource SoftCard}" Padding="{OnIdiom Desktop=34, Tablet=28, Phone=22}">
-                    <VerticalStackLayout Spacing="15">
-                        <Label Text="ENTRAR AL AULA" Style="{StaticResource Eyebrow}" />
-                        <Label Text="Datos de conexión" Style="{StaticResource SectionTitle}" />
-                        <Label Text="Tu nombre" TextColor="{StaticResource Muted}" FontSize="12" />
-                        <Border Style="{StaticResource FieldBorder}"><Entry Text="{Binding Name}" Placeholder="Ej. Sofía Ramírez" ReturnType="Next" /></Border>
-                        <Label Text="Dirección del host" TextColor="{StaticResource Muted}" FontSize="12" />
-                        <Border Style="{StaticResource FieldBorder}"><Entry Text="{Binding ServerUrl}" Placeholder="http://192.168.1.20:8000/" Keyboard="Url" ReturnType="Go" /></Border>
-                        <Button Text="Ver mis cursos" Command="{Binding ConnectCommand}" Style="{StaticResource PrimaryButton}" Margin="0,8,0,0" />
-                        <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Primary}" />
-                        <Border Padding="14,10" BackgroundColor="#F6F8F8" StrokeThickness="0"><Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape><Label Text="{Binding Status}" TextColor="{StaticResource Muted}" FontSize="12" HorizontalTextAlignment="Center" /></Border>
-                        <Border IsVisible="{Binding HasDiagnostic}" Padding="14" BackgroundColor="#FFF4F4" Stroke="#F4C7C9">
-                            <Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape>
-                            <VerticalStackLayout Spacing="8"><Label Text="No pudimos conectar" TextColor="{StaticResource Danger}" FontAttributes="Bold" /><Label Text="{Binding Diagnostic}" FontFamily="Consolas" FontSize="10" MaxLines="5" /><Button Text="Copiar diagnóstico" Command="{Binding CopyDiagnosticCommand}" Style="{StaticResource SecondaryButton}" /></VerticalStackLayout>
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="AVACOM STUDENT" Style="{StaticResource Eyebrow}" />
+                        <Label Text="¿Quién eres?" Style="{StaticResource PageTitle}" />
+                        <Label Text="Escribe tu nombre y la dirección del equipo del aula."
+                               TextColor="{StaticResource Muted}" FontSize="14" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Tu nombre" TextColor="{StaticResource Muted}" FontSize="13" />
+                        <Border Style="{StaticResource FieldBorder}">
+                            <Entry Text="{Binding Name}" Placeholder="Ej. Sofía Ramírez"
+                                   FontSize="{OnIdiom Desktop=17, Tablet=19, Phone=16}"
+                                   HeightRequest="{OnIdiom Tablet=62, Default=56}" />
                         </Border>
                     </VerticalStackLayout>
-                </Border>
-            </Grid>
+
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Equipo del aula" TextColor="{StaticResource Muted}" FontSize="13" />
+                        <Border Style="{StaticResource FieldBorder}">
+                            <Entry Text="{Binding ServerUrl}" Placeholder="192.168.0.29:8000"
+                                   Keyboard="Url"
+                                   FontSize="{OnIdiom Desktop=17, Tablet=19, Phone=16}"
+                                   HeightRequest="{OnIdiom Tablet=62, Default=56}" />
+                        </Border>
+
+                        <!--
+                          El semáforo. Es lo único que un alumno delante de una
+                          tableta que no conecta puede usar para saber qué pasa,
+                          así que va grande y con el motivo debajo.
+                        -->
+                        <Border Padding="18,14" BackgroundColor="#F3F7F7" StrokeThickness="0" Margin="0,6,0,0">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                <Ellipse WidthRequest="16" HeightRequest="16" VerticalOptions="Center" Fill="#A1A1AA">
+                                    <Ellipse.Triggers>
+                                        <DataTrigger TargetType="Ellipse" Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource Success}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Ellipse" Binding="{Binding IsFailed}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource Danger}" />
+                                        </DataTrigger>
+                                    </Ellipse.Triggers>
+                                </Ellipse>
+                                <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                    <Label Text="{Binding ConnectionLabel}" FontSize="18" FontAttributes="Bold"
+                                           TextColor="{StaticResource Muted}">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsConnected}" Value="True">
+                                                <Setter Property="TextColor" Value="{StaticResource Success}" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Label" Binding="{Binding IsFailed}" Value="True">
+                                                <Setter Property="TextColor" Value="{StaticResource Danger}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                    <Label Text="{Binding Status}" TextColor="{StaticResource Muted}"
+                                           FontSize="13" LineBreakMode="WordWrap" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <Button Text="Comprobar conexión" Command="{Binding CheckCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            HeightRequest="{OnIdiom Tablet=64, Default=58}" />
+
+                    <!-- Entrar solo se enciende con conexión verificada y un nombre escrito. -->
+                    <Button Text="Entrar" Command="{Binding EnterCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            HeightRequest="{OnIdiom Tablet=68, Default=62}"
+                            FontSize="{OnIdiom Tablet=19, Default=17}" />
+
+                    <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                       Color="{StaticResource Primary}" />
+
+                    <Label Text="Esta aplicación solo consulta. No puede instalar, cambiar ni borrar contenido."
+                           TextColor="{StaticResource Muted}" FontSize="11"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
         </Grid>
     </ScrollView>
 </ContentPage>

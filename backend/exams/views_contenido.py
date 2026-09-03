@@ -337,8 +337,13 @@ class CursoContenidoView(APIView):
     retirado sin serlo, porque su paquete nunca estuvo en ese catálogo.
     """
 
-    def get(self, _request, course_id):
+    def get(self, request, course_id):
         curso = get_object_or_404(Course, pk=course_id)
+        # Sanear escribe, y un GET no debe mutar por defecto. El panel lo pide
+        # con ?sanear=1 porque le conviene arreglarlo al pasar; una tableta NO
+        # lo pide, y así una tableta nunca puede tocar las banderas de presencia
+        # aunque conozca la ruta.
+        sanear = str(request.query_params.get("sanear") or "").lower() in ("1", "true", "si", "sí")
 
         # ── Lo que la biblioteca ofrece ahora ────────────────────────────────
         try:
@@ -426,7 +431,7 @@ class CursoContenidoView(APIView):
 
         # Se sanea aquí mismo para que la siguiente pantalla —y la tableta— no
         # tengan que esperar a que alguien pulse «Actualizar».
-        if registro_desfasado:
+        if registro_desfasado and sanear:
             from .reconciliacion import sanear_presencia
 
             sanear_presencia(fila, presente=True, actor="panel")
@@ -452,6 +457,10 @@ class CursoContenidoView(APIView):
             },
             "contenido_retirado": retirado,
             "motivo": motivo,
+            # Si el registro del LMS no coincide con la biblioteca. El panel lo
+            # arregla pidiendo ?sanear=1; una tableta solo lo informa.
+            "registro_desfasado": registro_desfasado,
+            "registro_saneado": registro_desfasado and sanear,
             # La estructura se esconde cuando no hay nada que abrir: enseñar
             # secciones y lecciones cuyo material no existe promete algo que la
             # tableta no puede cumplir.

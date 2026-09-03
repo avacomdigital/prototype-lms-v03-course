@@ -862,6 +862,8 @@ public sealed record CursoContenido(
     [property: JsonPropertyName("origen")] OrigenDelContenido Origin,
     [property: JsonPropertyName("contenido_retirado")] bool ContentWithdrawn,
     [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("registro_desfasado")] bool RecordStale,
+    [property: JsonPropertyName("registro_saneado")] bool RecordHealed,
     [property: JsonPropertyName("estructura_visible")] bool StructureVisible,
     [property: JsonPropertyName("elementos")] List<ContenidoElemento> Elements,
     [property: JsonPropertyName("materiales")] List<UnidadMaterial> Materials,
@@ -907,3 +909,86 @@ public sealed record CursoContenido(
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Lo que ve una tableta
+//
+// Sale de la MATRÍCULA, no del catálogo, y esa es la diferencia que importa:
+// un curso cuyo contenido desapareció del equipo SIGUE apareciendo, con su
+// progreso, marcado como no disponible. Si saliera del catálogo se
+// desvanecería, y el alumno no sabría si perdió su avance.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// <summary>Un curso del alumno, con su avance y si hoy se puede abrir.</summary>
+public sealed record CursoDelEstudiante(
+    [property: JsonPropertyName("course_id")] string CourseId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("progress")] double Progress,
+    [property: JsonPropertyName("progress_pct")] double ProgressPercent,
+    [property: JsonPropertyName("installed")] bool Installed,
+    [property: JsonPropertyName("available")] bool Available,
+    [property: JsonPropertyName("enrollment")] string? Enrollment,
+    [property: JsonPropertyName("content_format")] string? ContentFormat,
+    [property: JsonPropertyName("host_state")] string? HostState,
+    [property: JsonPropertyName("retired_at")] long? RetiredAt,
+    [property: JsonPropertyName("lessons")] int Lessons,
+    [property: JsonPropertyName("lessons_completed")] int LessonsCompleted)
+{
+    public string ProgressLabel => $"{ProgressPercent:0.#}%";
+
+    public string LessonsLabel => Lessons == 0
+        ? "Sin lecciones"
+        : $"{LessonsCompleted} de {Lessons} lecciones";
+
+    /// <summary>
+    /// El mensaje para el alumno cuando el contenido no está.
+    ///
+    /// Deliberadamente distinto del que ve el docente: al alumno no le sirve
+    /// saber que alguien desinstaló un paquete, le sirve saber que su avance
+    /// sigue ahí y que no tiene que hacer nada.
+    /// </summary>
+    public string StateLabel => Available
+        ? "Disponible"
+        : "Contenido no disponible";
+
+    public string StateDetail => Available
+        ? ""
+        : "Tu profesor retiró este material del equipo. Tu avance está guardado y "
+          + "volverá a estar cuando el material regrese.";
+
+    public string RetiredAtLabel => RetiredAt is null or 0
+        ? ""
+        : $"desde {DateTimeOffset.FromUnixTimeMilliseconds(RetiredAt.Value).ToLocalTime():dd/MM HH:mm}";
+}
+
+public sealed record CursosDelEstudiante(
+    [property: JsonPropertyName("student_id")] string StudentId,
+    [property: JsonPropertyName("host_id")] string HostId,
+    [property: JsonPropertyName("available")] List<CursoDelEstudiante> Available,
+    [property: JsonPropertyName("unavailable")] List<CursoDelEstudiante> Unavailable,
+    [property: JsonPropertyName("courses")] List<CursoDelEstudiante> Courses)
+{
+    public bool HasUnavailable => Unavailable.Count > 0;
+
+    public string Summary => Courses.Count == 0
+        ? "Todavía no tienes cursos asignados."
+        : Unavailable.Count == 0
+            ? $"{Courses.Count} curso(s) · todo el material está disponible"
+            : $"{Available.Count} de {Courses.Count} disponibles · "
+              + $"{Unavailable.Count} sin material en el equipo";
+}
+
+/// <summary>
+/// Una fila de m05_curso_host, tal como la publica la API.
+///
+/// La tableta la lee por un solo motivo: descubrir el `host_id` del equipo del
+/// aula, que hace falta para preguntar por los cursos del alumno. Es de solo
+/// lectura y el Student no escribe nunca en esa tabla.
+/// </summary>
+public sealed record FilaDeHost(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("host_id")] string HostId,
+    [property: JsonPropertyName("curso")] string? CourseId,
+    [property: JsonPropertyName("curso_titulo")] string? CourseTitle,
+    [property: JsonPropertyName("presente_local")] bool PresentLocally,
+    [property: JsonPropertyName("disponible_estudiante")] bool AvailableToStudents);

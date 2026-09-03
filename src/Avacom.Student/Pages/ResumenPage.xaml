@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Avacom.Student.ViewModels"
+             xmlns:models="clr-namespace:Avacom.OPS.Core.Models;assembly=Avacom.OPS.Core"
+             x:Class="Avacom.Student.Pages.ResumenPage"
+             x:DataType="vm:ResumenViewModel"
+             Background="{StaticResource PageGradient}"
+             Shell.NavBarIsVisible="False">
+    <Grid Padding="{OnIdiom Desktop=34, Tablet=26, Phone=16}" RowDefinitions="Auto,*" RowSpacing="20">
+
+        <!-- Cabecera: quién soy, a qué equipo estoy conectado, y Actualizar -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+            <VerticalStackLayout Spacing="3">
+                <Label Text="{Binding StudentName, StringFormat='Hola, {0}'}"
+                       Style="{StaticResource PageTitle}" />
+                <Label Text="{Binding ConnectionLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
+                <Label Text="{Binding ActualizadoLabel}" TextColor="{StaticResource Muted}" FontSize="11" />
+            </VerticalStackLayout>
+            <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                <!-- Comprobar si el material sigue estando es cosa del alumno:
+                     el docente puede retirarlo en cualquier momento. -->
+                <Button Text="Actualizar" Command="{Binding RefreshCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        HeightRequest="{OnIdiom Tablet=62, Default=54}" />
+                <Button Text="Salir" Command="{Binding DisconnectCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        TextColor="{StaticResource Muted}"
+                        HeightRequest="{OnIdiom Tablet=62, Default=54}" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout MaximumWidthRequest="1100" HorizontalOptions="Center"
+                                 Spacing="20" Padding="0,4,0,28">
+
+                <!-- El nodo dejó de responder: se dice y se conserva lo último visto. -->
+                <Border IsVisible="{Binding SinConexion}" Padding="20,16" BackgroundColor="#FDEEEE" StrokeThickness="0">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="SIN CONEXIÓN CON EL AULA" Style="{StaticResource Eyebrow}"
+                               TextColor="{StaticResource Danger}" />
+                        <Label Text="{Binding Status}" FontSize="13" LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="{Binding Resumen}" TextColor="{StaticResource Muted}" FontSize="14" />
+
+                <Border IsVisible="{Binding SinCursos}" Style="{StaticResource SoftCard}" Padding="30">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="TODAVÍA NADA" Style="{StaticResource Eyebrow}" />
+                        <Label Text="No tienes cursos asignados" Style="{StaticResource SectionTitle}" />
+                        <Label Text="Tu profesor todavía no te asignó ningún curso en este equipo."
+                               TextColor="{StaticResource Muted}" FontSize="13" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- MIS CURSOS · los no disponibles siguen aquí, atenuados -->
+                <VerticalStackLayout IsVisible="{Binding HayCursos}" Spacing="14">
+                    <Label Text="MIS CURSOS" Style="{StaticResource Eyebrow}" />
+                    <CollectionView ItemsSource="{Binding Cursos}" SelectionMode="None">
+                        <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="14" /></CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:CursoDelEstudiante">
+                                <Border Style="{StaticResource SoftCard}" Padding="{OnIdiom Tablet=24, Default=20}">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectCommand}"
+                                            CommandParameter="{Binding .}" />
+                                    </Border.GestureRecognizers>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                                        <Border WidthRequest="{OnIdiom Tablet=64, Default=56}"
+                                                HeightRequest="{OnIdiom Tablet=64, Default=56}"
+                                                BackgroundColor="#E8F8F1" StrokeThickness="0" VerticalOptions="Center">
+                                            <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                            <Label Text="✓" TextColor="{StaticResource Success}" FontSize="26"
+                                                   FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center" />
+                                        </Border>
+                                        <VerticalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center">
+                                            <Label Text="{Binding Name}" FontSize="{OnIdiom Tablet=21, Default=18}"
+                                                   FontAttributes="Bold" />
+                                            <Label Text="{Binding LessonsLabel}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                            <!-- El mensaje del alumno, distinto del que ve el docente. -->
+                                            <Label Text="{Binding StateDetail}" TextColor="{StaticResource Danger}"
+                                                   FontSize="12" LineBreakMode="WordWrap" />
+                                        </VerticalStackLayout>
+                                        <VerticalStackLayout Grid.Column="2" Spacing="4" VerticalOptions="Center">
+                                            <Label Text="{Binding ProgressLabel}" FontSize="{OnIdiom Tablet=22, Default=19}"
+                                                   FontAttributes="Bold" HorizontalTextAlignment="End" />
+                                            <Label Text="{Binding StateLabel}" FontSize="11" HorizontalTextAlignment="End"
+                                                   TextColor="{StaticResource Success}" />
+                                            <Label Text="{Binding RetiredAtLabel}" FontSize="10"
+                                                   HorizontalTextAlignment="End" TextColor="{StaticResource Muted}" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <!-- CONTENIDO DEL CURSO · lo mismo que ve el docente, con otro mensaje -->
+                <Border IsVisible="{Binding HayCursoElegido}" Style="{StaticResource SoftCard}"
+                        Padding="{OnIdiom Tablet=26, Default=22}">
+                    <VerticalStackLayout Spacing="16">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="CONTENIDO DEL CURSO" Style="{StaticResource Eyebrow}" />
+                            <Label Text="{Binding CursoElegido.Name}" Style="{StaticResource SectionTitle}" />
+                        </VerticalStackLayout>
+
+                        <!-- El aviso del alumno. Nada de «desinstalado»: eso es
+                             vocabulario del docente y no le dice nada a un niño. -->
+                        <Border IsVisible="{Binding CursoNoDisponible}" Padding="22" BackgroundColor="#FDEEEE" StrokeThickness="0">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                                <Label Text="⚠" FontSize="30" TextColor="{StaticResource Danger}" VerticalOptions="Start" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                    <Label Text="CONTENIDO NO DISPONIBLE" Style="{StaticResource Eyebrow}"
+                                           TextColor="{StaticResource Danger}" />
+                                    <Label Text="{Binding CursoElegido.StateDetail}" FontSize="14"
+                                           LineBreakMode="WordWrap" />
+                                    <Label Text="{Binding CursoElegido.RetiredAtLabel}"
+                                           TextColor="{StaticResource Muted}" FontSize="11" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+
+                        <!-- Lo que la biblioteca del aula ofrece de este curso -->
+                        <VerticalStackLayout IsVisible="{Binding HayContenido}" Spacing="10">
+                            <Label Text="EN EL EQUIPO DEL AULA" Style="{StaticResource Eyebrow}" />
+                            <CollectionView ItemsSource="{Binding Contenido}" SelectionMode="None">
+                                <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ContenidoElemento">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14" Padding="0,4">
+                                            <Border Padding="11,5" BackgroundColor="#F3EFFA" StrokeThickness="0" VerticalOptions="Center">
+                                                <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                                                <Label Text="{Binding KindLabel}" FontSize="11" FontAttributes="Bold" />
+                                            </Border>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                <Label Text="{Binding Title}" FontSize="15" FontAttributes="Bold" />
+                                                <Label Text="{Binding ContextLabel}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- ESTRUCTURA DEL CURSO · se esconde cuando no hay nada que abrir -->
+                <Border IsVisible="{Binding EstructuraVisible}" Style="{StaticResource SoftCard}"
+                        Padding="{OnIdiom Tablet=26, Default=22}">
+                    <VerticalStackLayout Spacing="16">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="ESTRUCTURA DEL CURSO" Style="{StaticResource Eyebrow}" />
+                            <Label Text="Lo que vas a recorrer" TextColor="{StaticResource Muted}" FontSize="13" />
+                        </VerticalStackLayout>
+                        <CollectionView ItemsSource="{Binding Secciones}" SelectionMode="None">
+                            <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="14" /></CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:CourseSection">
+                                    <Border Padding="20" BackgroundColor="#F7FAFB" Stroke="{StaticResource Line}">
+                                        <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                        <VerticalStackLayout Spacing="12">
+                                            <Label Text="{Binding NumberLabel}" Style="{StaticResource Eyebrow}" />
+                                            <Label Text="{Binding Title}" FontSize="{OnIdiom Tablet=19, Default=17}"
+                                                   FontAttributes="Bold" />
+                                            <CollectionView ItemsSource="{Binding Lessons}" SelectionMode="None">
+                                                <CollectionView.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:Lesson">
+                                                        <Grid ColumnDefinitions="Auto,*" Padding="0,7" ColumnSpacing="12">
+                                                            <Border WidthRequest="32" HeightRequest="32" BackgroundColor="White"
+                                                                    Stroke="{StaticResource Line}" VerticalOptions="Center">
+                                                                <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
+                                                                <Label Text="{Binding Position}" HorizontalOptions="Center"
+                                                                       VerticalOptions="Center" FontAttributes="Bold" FontSize="13" />
+                                                            </Border>
+                                                            <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                                <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="14" />
+                                                                <Label Text="{Binding ItemCountLabel}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                                            </VerticalStackLayout>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </CollectionView.ItemTemplate>
+                                            </CollectionView>
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}"
+                                   Color="{StaticResource Primary}" />
+
+                <Label Text="Esta aplicación solo consulta. No puede instalar, cambiar ni borrar contenido."
+                       TextColor="{StaticResource Muted}" FontSize="11" HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

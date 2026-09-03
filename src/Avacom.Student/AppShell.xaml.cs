@@ -8,9 +8,8 @@ public partial class AppShell : Shell
     {
         InitializeComponent();
         RootContent.Content = registrationPage;
-        Routing.RegisterRoute(nameof(CoursesPage), typeof(CoursesPage));
-        Routing.RegisterRoute(nameof(CourseDetailPage), typeof(CourseDetailPage));
-        Routing.RegisterRoute(nameof(ExamPage), typeof(ExamPage));
-        Routing.RegisterRoute(nameof(FinishedPage), typeof(FinishedPage));
+        // Dos pantallas y nada más: entrar, y ver qué hay. Todo lo demás que
+        // había aquí —detalle, examen, resultado— se quitó.
+        Routing.RegisterRoute(nameof(ResumenPage), typeof(ResumenPage));
     }
 }
