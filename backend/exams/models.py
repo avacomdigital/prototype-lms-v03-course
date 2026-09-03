@@ -764,6 +764,27 @@ class UnidadMaterial(models.Model):
     tipo = models.CharField(max_length=32, null=True, blank=True)
 
     orden = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+
+    # ── Reconciliación con el catálogo ───────────────────────────────────────
+    # El catálogo manda y no se cachea, así que la disponibilidad SIEMPRE se
+    # resuelve en vivo al dibujar una pantalla. Estas tres columnas no son una
+    # caché de eso: son la MEMORIA de la última revisión, y existen por dos
+    # motivos que la consulta en vivo no cubre.
+    #
+    #   · Poder decírselo al estudiante. La tableta pregunta al backend, y el
+    #     backend tiene que poder responder «esto ya no está» aunque en ese
+    #     momento la biblioteca esté cerrada y no haya nada que consultar.
+    #   · Poder decir DESDE CUÁNDO. «No disponible» es un estado; «no disponible
+    #     desde el martes» es una explicación, y es lo que el docente necesita
+    #     para saber si fue él quien lo quitó.
+    #
+    # Lo que estas columnas NO hacen es borrar nada. La referencia se queda, la
+    # matrícula se queda y la nota se queda: desaparecer del catálogo cambia la
+    # disponibilidad, nunca el expediente.
+    disponible_ultima_revision = models.BooleanField(default=True)
+    revisado_en = models.BigIntegerField(null=True, blank=True)
+    desaparecido_en = models.BigIntegerField(null=True, blank=True)
+
     creado_en = models.BigIntegerField(default=now_ms)
     creado_por = models.CharField(max_length=64, null=True, blank=True)
     secuencia = models.BigIntegerField(default=sequence_value)
@@ -771,18 +792,26 @@ class UnidadMaterial(models.Model):
     class Meta:
         db_table = "m05_unidad_material"
         ordering = ["leccion_id", "orden"]
+        indexes = [
+            models.Index(fields=["elemento_ref"], name="ix_m05_um_elemento"),
+            models.Index(fields=["taxonomia_ref"], name="ix_m05_um_taxonomia"),
+            models.Index(fields=["disponible_ultima_revision"], name="ix_m05_um_disp"),
+        ]
+        # El mismo material no se cuelga dos veces de la misma lección. La
+        # VERSIÓN entra en la clave: una lección puede referenciar dos versiones
+        # del mismo elemento durante una transición.
         constraints = [
-            # El mismo material no se cuelga dos veces de la misma lección. La
-            # VERSIÓN entra en la clave: una lección puede referenciar dos
-            # versiones del mismo elemento durante una transición.
             models.UniqueConstraint(
                 fields=["leccion", "elemento_ref", "version_elemento"],
                 name="ux_m05_um_leccion_elemento",
             ),
-        ]
-        indexes = [
-            models.Index(fields=["elemento_ref"], name="ix_m05_um_elemento"),
-            models.Index(fields=["taxonomia_ref"], name="ix_m05_um_taxonomia"),
+            # Marcar algo como no disponible obliga a decir desde cuándo: un
+            # «no está» sin fecha no se puede explicar.
+            models.CheckConstraint(
+                condition=models.Q(disponible_ultima_revision=True)
+                | models.Q(desaparecido_en__isnull=False),
+                name="ck_m05_um_ausencia_con_fecha",
+            ),
         ]
 
     def __str__(self):

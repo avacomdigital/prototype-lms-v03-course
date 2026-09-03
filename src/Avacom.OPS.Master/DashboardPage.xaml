@@ -66,6 +66,62 @@
                 <!-- RESUMEN -->
                 <ScrollView IsVisible="{Binding IsOverview}">
                     <VerticalStackLayout Spacing="22" Padding="2,2,8,24">
+
+                        <!--
+                          Estado de la biblioteca del aula. Se pone al día al abrir
+                          esta pantalla y al pulsar «Actualizar»: si el docente
+                          desinstaló material desde AVACOM-Contenido, aquí se ve sin
+                          tener que abrir las lecciones una por una.
+                        -->
+                        <Border IsVisible="{Binding HayCursosConMaterial}" Style="{StaticResource SoftCard}" Padding="26">
+                            <VerticalStackLayout Spacing="14">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                    <Ellipse WidthRequest="11" HeightRequest="11" VerticalOptions="Center" Fill="{StaticResource Success}">
+                                        <Ellipse.Triggers>
+                                            <DataTrigger TargetType="Ellipse" Binding="{Binding HayMaterialAusente}" Value="True">
+                                                <Setter Property="Fill" Value="{StaticResource Danger}" />
+                                            </DataTrigger>
+                                        </Ellipse.Triggers>
+                                    </Ellipse>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                        <Label Text="MATERIAL DE LA BIBLIOTECA" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding BibliotecaResumen}" FontSize="13" LineBreakMode="WordWrap" />
+                                    </VerticalStackLayout>
+                                </Grid>
+
+                                <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+
+                                <CollectionView ItemsSource="{Binding CursosConMaterial}" SelectionMode="None">
+                                    <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="10" /></CollectionView.ItemsLayout>
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:CursoConMaterial">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                                <VerticalStackLayout Spacing="3">
+                                                    <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="15" />
+                                                    <Label Text="{Binding Summary}" TextColor="{StaticResource Muted}" FontSize="12" />
+                                                </VerticalStackLayout>
+                                                <!-- «No disponible» es un estado; «no disponible desde
+                                                     el martes» es una explicación. -->
+                                                <Label Grid.Column="1" Text="{Binding MissingSinceLabel}"
+                                                       TextColor="{StaticResource Danger}" FontSize="12"
+                                                       VerticalOptions="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+
+                                <Label IsVisible="{Binding HayMaterialAusente}"
+                                       Text="El material ausente sigue colgado del curso y volverá solo si se reinstala. Las notas, el progreso y las matrículas no se tocaron."
+                                       TextColor="{StaticResource Info}" FontSize="12" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- Sin biblioteca no se reconcilia nada, y se dice por qué. -->
+                        <Border IsVisible="{Binding SinContenido}" Padding="20,16" BackgroundColor="#FDEEEE" StrokeThickness="0">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                            <Label Text="{Binding BibliotecaResumen}" FontSize="13" LineBreakMode="WordWrap" />
+                        </Border>
+
                         <CollectionView ItemsSource="{Binding Courses}" SelectionMode="None" HeightRequest="76">
                             <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Horizontal" ItemSpacing="12" /></CollectionView.ItemsLayout>
                             <CollectionView.ItemTemplate>
@@ -130,7 +186,111 @@
                             </VerticalStackLayout>
                         </Grid>
 
-                        <Border Style="{StaticResource SoftCard}">
+                        <!--
+                          CONTENIDO DEL CURSO · la subsección que dice si lo que
+                          este curso necesita sigue en el equipo.
+
+                          Se resuelve contra /v1/catalogo cada vez que se abre el
+                          resumen, se cambia de curso o se pulsa «Actualizar». El
+                          LMS no guarda el catálogo, así que esto no es una caché:
+                          es la respuesta de ahora mismo.
+                        -->
+                        <Border IsVisible="{Binding HayContenidoDelCurso}" Style="{StaticResource SoftCard}">
+                            <VerticalStackLayout Spacing="16">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                    <Ellipse WidthRequest="11" HeightRequest="11" VerticalOptions="Center" Fill="{StaticResource Success}">
+                                        <Ellipse.Triggers>
+                                            <DataTrigger TargetType="Ellipse" Binding="{Binding ContenidoRetirado}" Value="True">
+                                                <Setter Property="Fill" Value="{StaticResource Danger}" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Ellipse" Binding="{Binding ContenidoSinComprobar}" Value="True">
+                                                <Setter Property="Fill" Value="#A1A1AA" />
+                                            </DataTrigger>
+                                        </Ellipse.Triggers>
+                                    </Ellipse>
+                                    <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                        <Label Text="CONTENIDO DEL CURSO" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding ContenidoDelCurso.Headline}" Style="{StaticResource SectionTitle}" />
+                                        <Label Text="{Binding ContenidoDelCurso.Summary}" TextColor="{StaticResource Muted}" FontSize="13" LineBreakMode="WordWrap" />
+                                    </VerticalStackLayout>
+                                </Grid>
+
+                                <!-- EL AVISO. Es lo que sustituye a la estructura cuando el
+                                     contenido salió del equipo. -->
+                                <Border IsVisible="{Binding ContenidoRetirado}" Padding="22" BackgroundColor="#FDEEEE" StrokeThickness="0">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="18" /></Border.StrokeShape>
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                                        <Label Text="⚠" FontSize="30" TextColor="{StaticResource Danger}" VerticalOptions="Start" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="7">
+                                            <Label Text="CONTENIDO DESINSTALADO" Style="{StaticResource Eyebrow}" TextColor="{StaticResource Danger}" />
+                                            <Label Text="{Binding ContenidoDelCurso.Reason}" FontSize="14" FontAttributes="Bold" LineBreakMode="WordWrap" />
+                                            <Label Text="{Binding ContenidoDelCurso.WithdrawnDetail}" TextColor="{StaticResource Muted}" FontSize="12" LineBreakMode="WordWrap" />
+                                            <BoxView HeightRequest="1" Color="#F5C6C6" Margin="0,4" />
+                                            <Label Text="{Binding ContenidoDelCurso.Origin.OriginLabel}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                            <Label Text="{Binding ContenidoDelCurso.Origin.DependencyLabel}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+
+                                <!-- No se pudo comprobar NO es lo mismo que retirado, y por eso
+                                     no comparte el aviso: la biblioteca cerrada no es contenido
+                                     borrado. -->
+                                <Border IsVisible="{Binding ContenidoSinComprobar}" Padding="18" BackgroundColor="#F3F7F7" StrokeThickness="0">
+                                    <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                                    <VerticalStackLayout Spacing="5">
+                                        <Label Text="SIN COMPROBAR" Style="{StaticResource Eyebrow}" />
+                                        <Label Text="{Binding ContenidoDelCurso.ComponentReason}" FontSize="13" LineBreakMode="WordWrap" />
+                                        <Label Text="No se dice que el contenido falte, porque no se sabe: la biblioteca del aula no respondió."
+                                               TextColor="{StaticResource Muted}" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <!-- Lo que la biblioteca ofrece de este curso, en vivo -->
+                                <VerticalStackLayout IsVisible="{Binding HayElementosDelCurso}" Spacing="10">
+                                    <Label Text="EN LA BIBLIOTECA DEL AULA" Style="{StaticResource Eyebrow}" />
+                                    <CollectionView ItemsSource="{Binding ElementosDelCurso}" SelectionMode="None">
+                                        <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:ContenidoElemento">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14" Padding="0,4">
+                                                    <Border Padding="10,4" BackgroundColor="#F3EFFA" StrokeThickness="0" VerticalOptions="Center">
+                                                        <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                                                        <Label Text="{Binding KindLabel}" FontSize="11" FontAttributes="Bold" />
+                                                    </Border>
+                                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                                        <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="14" />
+                                                        <Label Text="{Binding Reference}" TextColor="{StaticResource Muted}" FontSize="11" />
+                                                    </VerticalStackLayout>
+                                                    <Label Grid.Column="2" Text="{Binding ContextLabel}" TextColor="{StaticResource Muted}" FontSize="11" VerticalOptions="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+                                </VerticalStackLayout>
+
+                                <!-- Lo colgado de sus lecciones, con su disponibilidad -->
+                                <VerticalStackLayout IsVisible="{Binding HayMaterialesDelCurso}" Spacing="10">
+                                    <BoxView HeightRequest="1" Color="{StaticResource Line}" />
+                                    <Label Text="COLGADO EN LAS LECCIONES" Style="{StaticResource Eyebrow}" />
+                                    <CollectionView ItemsSource="{Binding MaterialesDelCurso}" SelectionMode="None">
+                                        <CollectionView.ItemsLayout><LinearItemsLayout Orientation="Vertical" ItemSpacing="8" /></CollectionView.ItemsLayout>
+                                        <CollectionView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:UnidadMaterial">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14" Padding="0,4">
+                                                    <VerticalStackLayout Spacing="2">
+                                                        <Label Text="{Binding DisplayTitle}" FontAttributes="Bold" FontSize="14" />
+                                                        <Label Text="{Binding Reason}" TextColor="{StaticResource Danger}" FontSize="11" LineBreakMode="WordWrap" />
+                                                    </VerticalStackLayout>
+                                                    <Label Grid.Column="1" Text="{Binding StateLabel}" FontSize="12" VerticalOptions="Center" TextColor="{StaticResource Muted}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </CollectionView.ItemTemplate>
+                                    </CollectionView>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border IsVisible="{Binding EstructuraVisible}" Style="{StaticResource SoftCard}">
                             <VerticalStackLayout Spacing="18">
                                 <Grid ColumnDefinitions="*,Auto"><VerticalStackLayout><Label Text="Estructura del curso" Style="{StaticResource SectionTitle}" /><Label Text="La misma jerarquía que navega el estudiante" TextColor="{StaticResource Muted}" FontSize="13" /></VerticalStackLayout><Label Grid.Column="1" Text="{Binding FrameworkLabel}" TextColor="{StaticResource Info}" FontAttributes="Bold" VerticalOptions="Center" /></Grid>
                                 <CollectionView ItemsSource="{Binding SelectedCourse.Sections}" SelectionMode="None">

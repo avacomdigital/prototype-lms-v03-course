@@ -33,6 +33,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<Services.ApiDiagnostics>();
         // Abrir un archivo es capacidad de la plataforma: el ViewModel solo ve la interfaz.
         builder.Services.AddSingleton<Services.IPackageFileSource, Services.MauiPackageFileSource>();
+        // La única puerta del Master hacia la biblioteca del aula. Singleton
+        // porque recuerda la huella del catálogo para no recargar de más.
+        builder.Services.AddSingleton<BibliotecaDeContenido>();
         builder.Services.AddSingleton<DashboardViewModel>();
         builder.Services.AddSingleton<DashboardPage>();
         return builder.Build();

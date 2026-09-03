@@ -59,6 +59,23 @@ public interface ILmsApiClient
         string? tipo = null, CancellationToken cancellationToken = default);
 
     /// <summary>Qué material de la biblioteca cuelga de una lección.</summary>
+    /// <summary>
+    /// Pone al día la disponibilidad guardada contra el catálogo de hoy. Marca lo
+    /// que desapareció y lo que volvió, y retira de las tabletas lo que el equipo
+    /// ya no sirve. No borra referencias, matrículas, progreso ni notas.
+    /// </summary>
+    Task<ReconciliacionResultado> ReconciliarContenidoAsync(
+        string hostId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Si el contenido de un curso sigue en el equipo, y por qué no si no está.
+    /// Se resuelve contra /v1/catalogo en el momento de preguntar.
+    /// </summary>
+    Task<CursoContenido> GetCursoContenidoAsync(string courseId, CancellationToken cancellationToken = default);
+
+    /// <summary>Estado de la biblioteca y material por curso, sin escribir nada.</summary>
+    Task<InformeDeContenido> GetInformeContenidoAsync(CancellationToken cancellationToken = default);
+
     Task<MaterialesDeLeccion> GetMaterialesAsync(string lessonId, CancellationToken cancellationToken = default);
 
     /// <summary>Cuelga una referencia. La versión y el tipo los pone el componente.</summary>
@@ -343,6 +360,18 @@ public sealed class LmsApiClient(HttpClient httpClient) : ILmsApiClient
         var consulta = filtros.Count == 0 ? "" : "?" + string.Join("&", filtros);
         return GetAsync<ContenidoCatalogo>($"api/contenido/catalogo/{consulta}", cancellationToken);
     }
+
+    public Task<ReconciliacionResultado> ReconciliarContenidoAsync(
+        string hostId, CancellationToken cancellationToken = default) =>
+        PostAsync<ReconciliacionResultado>("api/contenido/reconciliar/",
+            new { host_id = hostId, actor = "docente-ops" }, cancellationToken);
+
+    public Task<CursoContenido> GetCursoContenidoAsync(string courseId, CancellationToken cancellationToken = default) =>
+        GetAsync<CursoContenido>(
+            $"api/courses/{Uri.EscapeDataString(courseId)}/contenido/", cancellationToken);
+
+    public Task<InformeDeContenido> GetInformeContenidoAsync(CancellationToken cancellationToken = default) =>
+        GetAsync<InformeDeContenido>("api/contenido/reconciliar/", cancellationToken);
 
     public Task<MaterialesDeLeccion> GetMaterialesAsync(string lessonId, CancellationToken cancellationToken = default) =>
         GetAsync<MaterialesDeLeccion>(

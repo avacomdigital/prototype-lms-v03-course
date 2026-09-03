@@ -14,6 +14,7 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     private readonly ILmsRealtimeClient _realtime;
     private readonly MasterEndpointSettings _endpoint;
     private readonly ILocalLog _log;
+    private readonly BibliotecaDeContenido _biblioteca;
     private readonly Services.LocalApiHost _apiHost;
     private readonly Services.ApiDiagnostics _diagnostics;
     private readonly Services.IPackageFileSource _packageFiles;
@@ -49,6 +50,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
 
     private CancellationTokenSource? _vigilanciaContenido;
     private string _huellaContenido = "";
+    private CursoContenido? _contenidoDelCurso;
+    private ReconciliacionResultado? _ultimaReconciliacion;
+    private string _bibliotecaResumen = "";
     private ContenidoEstado? _contenidoEstado;
     private MaterialesDeLeccion? _materiales;
     private string _contenidoStatus = "Consultando la biblioteca del aula…";
@@ -72,22 +76,39 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         ILocalLog log,
         Services.LocalApiHost apiHost,
         Services.ApiDiagnostics diagnostics,
-        Services.IPackageFileSource packageFiles)
+        Services.IPackageFileSource packageFiles,
+        BibliotecaDeContenido biblioteca)
     {
         _api = api;
         _realtime = realtime;
         _endpoint = endpoint;
         _log = log;
+        _biblioteca = biblioteca;
         _apiHost = apiHost;
         _diagnostics = diagnostics;
         _packageFiles = packageFiles;
         _serverUrl = endpoint.BaseUrl;
 
-        ShowOverviewCommand = new Command(() => CurrentView = "overview");
+        ShowOverviewCommand = new Command(async () =>
+        {
+            CurrentView = "overview";
+            // Abrir el resumen pone al día qué material sigue en el equipo. Es
+            // el momento natural: es la pantalla que el docente mira antes de
+            // dar la clase, y es cuando le importa saber si algo falta.
+            await ReconciliarBibliotecaAsync();
+        });
         ShowCreateCommand = new Command(() => CurrentView = "create");
         ShowStudentsCommand = new Command(() => CurrentView = "students");
         ShowResultsCommand = new Command(() => CurrentView = "results");
-        RefreshCommand = new Command(async () => await LoadAsync(force: true), () => !IsBusy);
+        RefreshCommand = new Command(async () =>
+        {
+            await LoadAsync(force: true);
+            // «Actualizar» significa «ponme al día», y eso incluye la
+            // biblioteca. Reconciliar es idempotente, así que pulsarlo tres
+            // veces seguidas no hace daño.
+            _biblioteca.OlvidarHuella();
+            await ReconciliarBibliotecaAsync();
+        }, () => !IsBusy);
         SelectCourseCommand = new Command<Course>(async course => await SelectCourseAsync(course));
         SelectResultCommand = new Command<QuizAttempt>(async item => await SelectResultAsync(item));
         CloseDetailCommand = new Command(() => SelectedDetail = null);
@@ -256,6 +277,9 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
             if (!Set(ref _selectedCourse, value)) return;
             NotifyCourse();
             AssignStudentCommand.ChangeCanExecute();
+            // Cambiar de curso obliga a volver a preguntar por su contenido: el
+            // veredicto es por curso, no global.
+            _ = CargarContenidoDelCursoAsync();
         }
     }
 
@@ -425,6 +449,89 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
         get => _endpoint.HostId;
         set { _endpoint.HostId = value; Notify(); }
     }
+
+    /// <summary>
+    /// El contenido del curso seleccionado, resuelto contra /v1/catalogo.
+    ///
+    /// Es lo que dibuja la subsección «Contenido del curso» y lo que decide si
+    /// la estructura se muestra. Null mientras no se haya podido comprobar, y
+    /// eso NO significa que el contenido esté retirado: significa que no se
+    /// sabe, y la pantalla lo dice así.
+    /// </summary>
+    public CursoContenido? ContenidoDelCurso
+    {
+        get => _contenidoDelCurso;
+        private set
+        {
+            Set(ref _contenidoDelCurso, value);
+            Notify(nameof(ContenidoRetirado));
+            Notify(nameof(EstructuraVisible));
+            Notify(nameof(HayContenidoDelCurso));
+            Notify(nameof(ContenidoSinComprobar));
+            ElementosDelCurso.Clear();
+            foreach (var elemento in value?.Elements ?? []) ElementosDelCurso.Add(elemento);
+            MaterialesDelCurso.Clear();
+            foreach (var material in value?.Materials ?? []) MaterialesDelCurso.Add(material);
+            Notify(nameof(HayElementosDelCurso));
+            Notify(nameof(HayMaterialesDelCurso));
+        }
+    }
+
+    /// <summary>Los elementos que la biblioteca ofrece del paquete de este curso.</summary>
+    public ObservableCollection<ContenidoElemento> ElementosDelCurso { get; } = [];
+
+    /// <summary>Las referencias que alguien colgó de sus lecciones.</summary>
+    public ObservableCollection<UnidadMaterial> MaterialesDelCurso { get; } = [];
+
+    public bool HayElementosDelCurso => ElementosDelCurso.Count > 0;
+    public bool HayMaterialesDelCurso => MaterialesDelCurso.Count > 0;
+    public bool HayContenidoDelCurso => ContenidoDelCurso is not null;
+
+    /// <summary>El contenido de este curso salió del equipo.</summary>
+    public bool ContenidoRetirado => ContenidoDelCurso?.ContentWithdrawn == true;
+
+    /// <summary>
+    /// La estructura solo se muestra si hay contenido que abrir. Enseñar
+    /// secciones y lecciones cuyo material no existe promete algo que la tableta
+    /// no puede cumplir.
+    /// </summary>
+    public bool EstructuraVisible => ContenidoDelCurso is null
+        || ContenidoDelCurso.StructureVisible;
+
+    /// <summary>
+    /// No se pudo comprobar. Es distinto de «retirado» y se dice distinto: la
+    /// biblioteca cerrada no es contenido borrado.
+    /// </summary>
+    public bool ContenidoSinComprobar =>
+        ContenidoDelCurso is not null
+        && !ContenidoDelCurso.ComponentAvailable
+        && !ContenidoDelCurso.ContentWithdrawn;
+
+    /// <summary>
+    /// Los cursos del LMS con cuánto de su material de biblioteca sigue estando.
+    /// Se dibuja en el resumen para que un material ausente se vea sin abrir las
+    /// lecciones una por una.
+    /// </summary>
+    public ObservableCollection<CursoConMaterial> CursosConMaterial { get; } = [];
+
+    public bool HayCursosConMaterial => CursosConMaterial.Count > 0;
+    public bool HayMaterialAusente => CursosConMaterial.Any(c => c.HasMissing);
+
+    /// <summary>Lo que cambió en la última puesta al día. Null si no se ha hecho.</summary>
+    public ReconciliacionResultado? UltimaReconciliacion
+    {
+        get => _ultimaReconciliacion;
+        private set
+        {
+            Set(ref _ultimaReconciliacion, value);
+            Notify(nameof(HuboCambiosEnBiblioteca));
+        }
+    }
+
+    public bool HuboCambiosEnBiblioteca => UltimaReconciliacion?.Changed == true;
+
+    /// <summary>Una frase para el docente sobre el estado de la biblioteca.</summary>
+    public string BibliotecaResumen { get => _bibliotecaResumen; private set => Set(ref _bibliotecaResumen, value); }
 
     /// <summary>
     /// Lo que la biblioteca del aula ofrece AHORA. No se guarda: cada vez que se
@@ -1087,6 +1194,90 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
     }
 
     /// <summary>
+    /// Pregunta si el contenido del curso seleccionado sigue en el equipo.
+    ///
+    /// Se llama al elegir un curso, al abrir el resumen y al pulsar
+    /// «Actualizar». Cuando el backend no puede comprobarlo deja
+    /// ContenidoDelCurso en null, que la pantalla traduce a «no se pudo
+    /// comprobar» y NO a «retirado».
+    /// </summary>
+    private async Task CargarContenidoDelCursoAsync()
+    {
+        var curso = SelectedCourse;
+        if (curso is null)
+        {
+            ContenidoDelCurso = null;
+            return;
+        }
+        try
+        {
+            ContenidoDelCurso = await _biblioteca.ContenidoDelCursoAsync(curso.Id);
+        }
+        catch (Exception excepcion)
+        {
+            ContenidoDelCurso = null;
+            await _log.WriteAsync("contenido", "curso_contenido_failed", excepcion);
+        }
+    }
+
+    /// <summary>
+    /// Pone al día qué material sigue disponible, y lo cuenta en pantalla.
+    ///
+    /// Lo llama la apertura del resumen y el botón «Actualizar». Cuando no hay
+    /// biblioteca NO reconcilia: comparar contra un catálogo que no se pudo leer
+    /// marcaría todo como desaparecido justo cuando menos conviene. En ese caso
+    /// se dice que no está y se deja lo guardado como estaba.
+    /// </summary>
+    private async Task ReconciliarBibliotecaAsync()
+    {
+        try
+        {
+            var (estado, _) = await _biblioteca.ConsultarEstadoAsync();
+            ContenidoEstado = estado;
+
+            if (!estado.Available)
+            {
+                BibliotecaResumen =
+                    $"Biblioteca no disponible: {estado.Reason} " +
+                    "Lo que ya estaba colgado en los cursos no se tocó.";
+                return;
+            }
+
+            var resultado = await _biblioteca.ReconciliarAsync(HostId);
+            if (resultado is null)
+            {
+                BibliotecaResumen = "La biblioteca dejó de responder a mitad de la revisión.";
+                return;
+            }
+
+            UltimaReconciliacion = resultado;
+            CursosConMaterial.Clear();
+            foreach (var curso in resultado.ByCourse) CursosConMaterial.Add(curso);
+            Notify(nameof(HayCursosConMaterial));
+            Notify(nameof(HayMaterialAusente));
+
+            BibliotecaResumen = resultado.HasVersionChanges
+                ? $"{resultado.Message} {resultado.VersionChangesLabel}"
+                : resultado.Message;
+
+            // El veredicto del curso a la vista se recalcula con el resto: si
+            // no, el docente vería el aviso general al día y la subsección del
+            // curso desactualizada.
+            await CargarContenidoDelCursoAsync();
+        }
+        catch (LmsApiException excepcion)
+        {
+            BibliotecaResumen = $"No se pudo revisar la biblioteca: {ExtractDetail(excepcion.ResponseBody)}";
+            await _log.WriteAsync("contenido", "reconciliar_failed", excepcion);
+        }
+        catch (Exception excepcion)
+        {
+            BibliotecaResumen = $"No se pudo revisar la biblioteca: {excepcion.Message}";
+            await _log.WriteAsync("contenido", "reconciliar_failed", excepcion);
+        }
+    }
+
+    /// <summary>
     /// Pregunta cada pocos segundos si el catálogo cambió, y solo entonces lo
     /// recarga.
     ///
@@ -1121,6 +1312,10 @@ public sealed class DashboardViewModel : INotifyPropertyChanged, IAsyncDisposabl
                     await MainThread.InvokeOnMainThreadAsync(async () =>
                     {
                         await LoadContenidoAsync();
+                        // Si el catálogo cambió, lo guardado también tiene que
+                        // enterarse: si no, la tableta seguiría ofreciendo algo
+                        // que el equipo ya no puede servir.
+                        await ReconciliarBibliotecaAsync();
                         ContenidoStatus += "  ·  la biblioteca cambió y se recargó sola.";
                     });
                 }

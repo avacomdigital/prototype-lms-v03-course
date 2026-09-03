@@ -26,6 +26,7 @@ from . import contenido as componente
 from .models import (
     Activity,
     Course,
+    CourseHost,
     ExamenPregunta,
     Lesson,
     RepartoActivo,
@@ -120,6 +121,11 @@ def _material_json(fila, resuelto):
         "duracion_seg": vivo.get("duracion_seg"),
         "paquete": vivo.get("paquete"),
         "motivo": vivo.get("motivo", ""),
+        # La última revisión: sirve para poder decir «desde cuándo» y para poder
+        # contestarle a una tableta cuando la biblioteca esté cerrada.
+        "disponible_ultima_revision": fila.disponible_ultima_revision,
+        "revisado_en": fila.revisado_en,
+        "desaparecido_en": fila.desaparecido_en,
         # Que la versión referenciada ya no sea la instalada es información, no
         # un error: el docente decide si actualiza la referencia o la deja.
         "version_cambio": bool(
@@ -152,6 +158,78 @@ class ContenidoEstadoView(APIView):
 
     def get(self, _request):
         return Response(componente.estado())
+
+
+class ContenidoReconciliarView(APIView):
+    """
+    GET  /api/contenido/reconciliar/  · qué diría una reconciliación, sin escribir
+    POST /api/contenido/reconciliar/  · ponerlo al día y dejar constancia
+
+    Es lo que el panel llama al abrir «Resumen» y al pulsar «Actualizar». Pone la
+    disponibilidad guardada de acuerdo con el catálogo de hoy, cierra el reparto
+    de lo que ya no está, y NO borra nada del expediente académico.
+
+    Si la biblioteca no responde, devuelve 503 y no escribe: reconciliar contra
+    un catálogo que no se pudo leer marcaría todo como desaparecido, que es el
+    error que arruinaría una clase con la biblioteca cerrada.
+    """
+
+    def get(self, _request):
+        from .reconciliacion import resumen_por_curso
+
+        estado_actual = componente.estado()
+        return Response({
+            "componente": estado_actual,
+            "por_curso": resumen_por_curso(),
+        })
+
+    def post(self, request):
+        from .reconciliacion import reconciliar, resumen_por_curso
+
+        try:
+            resultado = reconciliar(
+                actor=request.data.get("actor") or "docente-ops",
+                host_id=(request.data.get("host_id") or "").strip() or None,
+            )
+        except componente.ContenidoNoDisponible as exc:
+            return _sin_componente(str(exc))
+        except componente.ContenidoError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        resultado["por_curso"] = resumen_por_curso()
+        resultado["mensaje"] = _mensaje_de_reconciliacion(resultado)
+        return Response(resultado)
+
+
+def _mensaje_de_reconciliacion(resultado):
+    """Una frase para el docente. «3 cambios» no dice nada; esto sí."""
+    if not resultado["hubo_cambios"]:
+        return (
+            f"Todo al día: {resultado['disponibles']} de {resultado['referencias']} "
+            f"materiales disponibles."
+        )
+    partes = []
+    if resultado["desaparecidos"]:
+        cuantos = len(resultado["desaparecidos"])
+        partes.append(
+            f"{cuantos} material(es) ya no están en el equipo y quedaron marcados "
+            f"como no disponibles"
+        )
+    if resultado["reaparecidos"]:
+        partes.append(f"{len(resultado['reaparecidos'])} volvieron a estar disponibles")
+    for entrada in resultado.get("presencia_saneada", []):
+        partes.append(
+            f"«{entrada['titulo']}» volvió a tener contenido"
+            if entrada["presente"]
+            else f"«{entrada['titulo']}» se quedó sin contenido en el equipo"
+        )
+    if resultado["repartos_cerrados"]:
+        partes.append(
+            f"{len(resultado['repartos_cerrados'])} se retiraron de las tabletas "
+            f"porque el equipo ya no los sirve"
+        )
+    return (". ".join(p.capitalize() if i == 0 else p for i, p in enumerate(partes))
+            + ". Las notas y el progreso no se tocaron.")
 
 
 class ContenidoCatalogoView(APIView):
@@ -234,6 +312,170 @@ class ContenidoMostrarView(APIView):
 
 
 # ── Material de una lección ──────────────────────────────────────────────────
+class CursoContenidoView(APIView):
+    """
+    GET /api/courses/{id}/contenido/
+
+    Si el contenido de este curso sigue en el equipo, y por qué no si no está.
+    Es lo que dibuja la subsección «Contenido del curso» del panel, y lo que
+    decide si la estructura se muestra o se sustituye por un aviso.
+
+    El veredicto sale de TRES fuentes, y hacen falta las tres porque un curso
+    puede haber llegado por caminos distintos:
+
+      1. `m05_curso_host.presente_local` — lo desinstalaron desde esta OPS con
+         la pantalla «Eliminar curso».
+      2. El PAQUETE de origen, cuando el curso vino de AVACOM-Contenido: si
+         `/v1/catalogo` ya no ofrece nada de ese `package_identifier`, su
+         contenido salió del equipo aunque el curso siga aquí.
+      3. Las referencias colgadas en las lecciones: si están todas ausentes, no
+         hay nada que abrir.
+
+    Y una distinción que importa: un curso SCORM o CMI5 NO depende de la
+    biblioteca. Su contenido se copió al LMS al importarlo y su presencia la
+    gobierna `presente_local`. Juzgarlo contra `/v1/catalogo` lo marcaría como
+    retirado sin serlo, porque su paquete nunca estuvo en ese catálogo.
+    """
+
+    def get(self, _request, course_id):
+        curso = get_object_or_404(Course, pk=course_id)
+
+        # ── Lo que la biblioteca ofrece ahora ────────────────────────────────
+        try:
+            elementos = _lista(componente.catalogo(), "elementos", "items")
+            hay_componente, motivo_componente = True, ""
+        except (componente.ContenidoNoDisponible, componente.ContenidoError) as exc:
+            elementos, hay_componente, motivo_componente = [], False, str(exc)
+
+        refs_vivas = {e["ref"] for e in elementos if e.get("ref")}
+        paquetes_vivos = {e["paquete"] for e in elementos if e.get("paquete")}
+
+        # ── De dónde vino este curso ─────────────────────────────────────────
+        fila = (
+            CourseHost.objects.filter(curso=curso)
+            .order_by("-presente_local", "-instalado_en")
+            .first()
+        )
+        depende_de_biblioteca = (
+            fila is not None and fila.formato_contenido == CourseHost.FORMATO_AVACOM_CONTENIDO
+        )
+        paquete = fila.package_identifier if fila else None
+        # Sin componente no se puede afirmar que el paquete no está: solo que no
+        # se pudo comprobar. Marcarlo como ausente sería el mismo error que
+        # reconciliar a ciegas.
+        paquete_presente = (
+            None if (not hay_componente or not depende_de_biblioteca or not paquete)
+            else paquete in paquetes_vivos
+        )
+
+        # ── Las referencias colgadas de sus lecciones ────────────────────────
+        materiales = list(
+            UnidadMaterial.objects.filter(
+                leccion__seccion__curso_version__curso=curso
+            ).select_related("leccion")
+        )
+        resuelto, _, _ = _resolver([m.elemento_ref for m in materiales])
+        disponibles = sum(1 for m in materiales if resuelto[m.elemento_ref]["disponible"])
+
+        # ── El veredicto ─────────────────────────────────────────────────────
+        # El orden importa, y esta es la regla: cuando el contenido de un curso
+        # vive en la BIBLIOTECA, el catálogo manda sobre lo que el LMS tenga
+        # guardado. `presente_local` es una bandera del LMS que cachea un hecho
+        # que no le pertenece; si el paquete volvió y esa bandera sigue en false,
+        # la que se equivoca es la bandera. Consultarla primero era lo que dejaba
+        # el cartel de «desinstalado» pegado tras reinstalar.
+        retirado = False
+        motivo = ""
+        registro_desfasado = False
+
+        if depende_de_biblioteca and paquete_presente is False:
+            retirado = True
+            motivo = (
+                f"La biblioteca del aula ya no ofrece el paquete «{paquete}». El "
+                f"contenido de este curso fue desinstalado o lo deshabilitó la "
+                f"política de la escuela."
+            )
+        elif depende_de_biblioteca and paquete_presente is True:
+            # Está en el catálogo: hay contenido que abrir, punto.
+            retirado = False
+            if fila is not None and not fila.presente_local:
+                registro_desfasado = True
+                motivo = (
+                    "El paquete volvió a la biblioteca del aula. El registro del "
+                    "LMS decía lo contrario y se saneó al revisar."
+                )
+        elif fila is not None and not fila.presente_local:
+            # Contenido que el LMS copió al importarlo (SCORM, CMI5, .json): su
+            # presencia sí la gobierna esta bandera, porque los archivos son suyos.
+            retirado = True
+            motivo = (
+                "El contenido de este curso se desinstaló de esta OPS. Los "
+                "estudiantes, el progreso y las calificaciones se conservaron."
+            )
+        elif materiales and disponibles == 0:
+            retirado = True
+            motivo = (
+                "Ninguno de los materiales de este curso está disponible en el "
+                "equipo ahora mismo."
+            )
+        elif not hay_componente and depende_de_biblioteca:
+            motivo = (
+                f"No se pudo comprobar el contenido: {motivo_componente} Se muestra "
+                f"lo último que se sabía."
+            )
+
+        # Se sanea aquí mismo para que la siguiente pantalla —y la tableta— no
+        # tengan que esperar a que alguien pulse «Actualizar».
+        if registro_desfasado:
+            from .reconciliacion import sanear_presencia
+
+            sanear_presencia(fila, presente=True, actor="panel")
+
+        # ── Qué elementos del paquete siguen vivos ───────────────────────────
+        # Sirve para que la subsección liste el contenido real del curso y no
+        # solo las referencias que alguien colgó a mano.
+        del_paquete = [e for e in elementos if e.get("paquete") == paquete] if paquete else []
+
+        return Response({
+            "curso": curso.pk,
+            "titulo": curso.titulo,
+            "componente_disponible": hay_componente,
+            "motivo_componente": motivo_componente,
+            "origen": {
+                "formato_contenido": fila.formato_contenido if fila else None,
+                "formato_legible": fila.get_formato_contenido_display() if fila else None,
+                "package_identifier": paquete,
+                "depende_de_biblioteca": depende_de_biblioteca,
+                "paquete_presente": paquete_presente,
+                "presente_local": fila.presente_local if fila else None,
+                "retirado_en": fila.retirado_en if fila else None,
+            },
+            "contenido_retirado": retirado,
+            "motivo": motivo,
+            # La estructura se esconde cuando no hay nada que abrir: enseñar
+            # secciones y lecciones cuyo material no existe promete algo que la
+            # tableta no puede cumplir.
+            "estructura_visible": not retirado,
+            "elementos": [{
+                "ref": e.get("ref"),
+                "tipo": e.get("tipo"),
+                "titulo": e.get("titulo"),
+                "nivel": e.get("nivel"),
+                "grado": e.get("grado"),
+                "asignatura": e.get("asignatura"),
+                "duracion_seg": e.get("duracion_seg"),
+                "disponible": True,
+            } for e in del_paquete],
+            "materiales": [_material_json(m, resuelto) for m in materiales],
+            "conteos": {
+                "elementos_del_paquete": len(del_paquete),
+                "materiales": len(materiales),
+                "materiales_disponibles": disponibles,
+                "materiales_ausentes": len(materiales) - disponibles,
+            },
+        })
+
+
 class LeccionMaterialView(APIView):
     """
     GET  /api/lecciones/{id}/materiales/  · qué material del componente cuelga aquí

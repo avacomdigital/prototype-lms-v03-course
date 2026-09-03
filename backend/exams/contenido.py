@@ -395,9 +395,21 @@ def estado():
 
 
 def _huella_catalogo(datos):
+    """
+    Con qué se detecta que el catálogo cambió, en orden de preferencia.
+
+    1. `generacion` — el contador monótono del D-3, lo más fiable.
+    2. `huella_catalogo` — el componente ya lo publica y sirve igual: cambia
+       cuando cambia el catálogo, aunque no diga en qué dirección.
+    3. Los contadores — el último recurso. No detecta un cambio que deje los
+       totales iguales, y por eso se prefiere cualquiera de los dos anteriores.
+    """
     generacion = datos.get("generacion")
     if generacion is not None:
         return f"g{generacion}"
+    propia = datos.get("huella_catalogo")
+    if propia:
+        return f"h{propia}"
     return "c{}-{}-{}".format(
         datos.get("elementos"), datos.get("paquetes"), datos.get("politicas")
     )

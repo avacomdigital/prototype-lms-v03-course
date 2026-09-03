@@ -750,3 +750,160 @@ public sealed record ContenidoParaEstudiante(
     [property: JsonPropertyName("motivo")] string Reason,
     [property: JsonPropertyName("count")] int Count,
     [property: JsonPropertyName("materiales")] List<MaterialParaEstudiante> Items);
+
+/// <summary>Un curso del LMS y cuánto de su material de biblioteca sigue estando.</summary>
+public sealed record CursoConMaterial(
+    [property: JsonPropertyName("curso")] string CourseId,
+    [property: JsonPropertyName("titulo")] string Title,
+    [property: JsonPropertyName("materiales")] int Total,
+    [property: JsonPropertyName("disponibles")] int Available,
+    [property: JsonPropertyName("ausentes")] int Missing,
+    [property: JsonPropertyName("ausentes_desde")] long? MissingSince)
+{
+    public bool HasMissing => Missing > 0;
+
+    public string Summary => Total == 0
+        ? "Sin material de la biblioteca"
+        : Missing == 0
+            ? $"{Total} material(es) · todos disponibles"
+            : $"{Available} de {Total} disponibles · {Missing} ya no está(n) en el equipo";
+
+    /// <summary>
+    /// «No disponible» es un estado; «no disponible desde el martes» es una
+    /// explicación, y es lo que el docente necesita para saber si fue él.
+    /// </summary>
+    public string MissingSinceLabel => MissingSince is null or 0
+        ? ""
+        : $"desde {DateTimeOffset.FromUnixTimeMilliseconds(MissingSince.Value).ToLocalTime():dd/MM HH:mm}";
+}
+
+/// <summary>Una referencia cuya versión guardada ya no es la instalada.</summary>
+public sealed record CambioDeVersion(
+    [property: JsonPropertyName("elemento_ref")] string Reference,
+    [property: JsonPropertyName("version_guardada")] string Stored,
+    [property: JsonPropertyName("version_disponible")] string Available);
+
+/// <summary>
+/// Lo que cambió al poner al día la disponibilidad. Nada de esto borra
+/// expediente académico: solo dice qué se puede abrir hoy y qué no.
+/// </summary>
+public sealed record ReconciliacionResultado(
+    [property: JsonPropertyName("revisado_en")] long CheckedAt,
+    [property: JsonPropertyName("catalogo")] int CatalogSize,
+    [property: JsonPropertyName("referencias")] int References,
+    [property: JsonPropertyName("disponibles")] int Available,
+    [property: JsonPropertyName("no_disponibles")] int Missing,
+    [property: JsonPropertyName("desaparecidos")] List<string> Vanished,
+    [property: JsonPropertyName("reaparecidos")] List<string> Returned,
+    [property: JsonPropertyName("cambio_version")] List<CambioDeVersion> VersionChanges,
+    [property: JsonPropertyName("repartos_cerrados")] List<string> WithdrawnFromTablets,
+    [property: JsonPropertyName("hubo_cambios")] bool Changed,
+    [property: JsonPropertyName("mensaje")] string Message,
+    [property: JsonPropertyName("por_curso")] List<CursoConMaterial> ByCourse)
+{
+    public bool HasVersionChanges => VersionChanges.Count > 0;
+
+    public string VersionChangesLabel => VersionChanges.Count == 0
+        ? ""
+        : $"{VersionChanges.Count} material(es) tienen una versión más nueva en el equipo. " +
+          "La referencia del curso no se cambió sola: eso lo decide el docente.";
+}
+
+/// <summary>Lo que el panel necesita saber sin escribir nada: estado y material por curso.</summary>
+public sealed record InformeDeContenido(
+    [property: JsonPropertyName("componente")] ContenidoEstado Component,
+    [property: JsonPropertyName("por_curso")] List<CursoConMaterial> ByCourse);
+
+/// <summary>De dónde vino el contenido de un curso, y si su origen sigue estando.</summary>
+public sealed record OrigenDelContenido(
+    [property: JsonPropertyName("formato_contenido")] string? ContentFormat,
+    [property: JsonPropertyName("formato_legible")] string? FormatLabel,
+    [property: JsonPropertyName("package_identifier")] string? PackageIdentifier,
+    [property: JsonPropertyName("depende_de_biblioteca")] bool DependsOnLibrary,
+    [property: JsonPropertyName("paquete_presente")] bool? PackagePresent,
+    [property: JsonPropertyName("presente_local")] bool? PresentLocally,
+    [property: JsonPropertyName("retirado_en")] long? RetiredAt)
+{
+    public string OriginLabel => string.IsNullOrWhiteSpace(PackageIdentifier)
+        ? "Curso creado en el LMS · no depende de la biblioteca"
+        : $"{FormatLabel} · {PackageIdentifier}";
+
+    /// <summary>
+    /// Un curso SCORM o CMI5 no se juzga contra el catálogo de la biblioteca: su
+    /// contenido se copió al LMS al importarlo y su presencia la gobierna
+    /// `presente_local`. Decirlo en pantalla evita que alguien busque en la
+    /// biblioteca un paquete que nunca estuvo ahí.
+    /// </summary>
+    public string DependencyLabel => DependsOnLibrary
+        ? "Su contenido vive en la biblioteca del aula"
+        : "Su contenido está dentro del LMS";
+
+    public string RetiredAtLabel => RetiredAt is null or 0
+        ? ""
+        : $"desde {DateTimeOffset.FromUnixTimeMilliseconds(RetiredAt.Value).ToLocalTime():dd/MM/yyyy HH:mm}";
+}
+
+public sealed record ConteosDeContenido(
+    [property: JsonPropertyName("elementos_del_paquete")] int PackageElements,
+    [property: JsonPropertyName("materiales")] int Materials,
+    [property: JsonPropertyName("materiales_disponibles")] int MaterialsAvailable,
+    [property: JsonPropertyName("materiales_ausentes")] int MaterialsMissing);
+
+/// <summary>
+/// El contenido de un curso, resuelto contra /v1/catalogo en el momento de
+/// preguntar. Es lo que dibuja la subsección «Contenido del curso» y lo que
+/// decide si la estructura se muestra o se sustituye por un aviso.
+/// </summary>
+public sealed record CursoContenido(
+    [property: JsonPropertyName("curso")] string CourseId,
+    [property: JsonPropertyName("titulo")] string Title,
+    [property: JsonPropertyName("componente_disponible")] bool ComponentAvailable,
+    [property: JsonPropertyName("motivo_componente")] string ComponentReason,
+    [property: JsonPropertyName("origen")] OrigenDelContenido Origin,
+    [property: JsonPropertyName("contenido_retirado")] bool ContentWithdrawn,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("estructura_visible")] bool StructureVisible,
+    [property: JsonPropertyName("elementos")] List<ContenidoElemento> Elements,
+    [property: JsonPropertyName("materiales")] List<UnidadMaterial> Materials,
+    [property: JsonPropertyName("conteos")] ConteosDeContenido Counts)
+{
+    public bool HasElements => Elements.Count > 0;
+    public bool HasMaterials => Materials.Count > 0;
+
+    /// <summary>Cuando no hay nada que listar tampoco hay que dejar el hueco vacío.</summary>
+    public bool HasNothingToShow => Elements.Count == 0 && Materials.Count == 0;
+
+    public string Headline => ContentWithdrawn
+        ? "El contenido de este curso fue desinstalado"
+        : ComponentAvailable
+            ? "Contenido disponible en el equipo"
+            : "No se pudo comprobar el contenido";
+
+    public string Summary
+    {
+        get
+        {
+            if (ContentWithdrawn) return Reason;
+            var partes = new List<string>();
+            if (Counts.PackageElements > 0)
+                partes.Add($"{Counts.PackageElements} elemento(s) en la biblioteca");
+            if (Counts.Materials > 0)
+                partes.Add($"{Counts.MaterialsAvailable} de {Counts.Materials} materiales colgados están disponibles");
+            if (partes.Count == 0)
+                partes.Add("Este curso todavía no tiene contenido de la biblioteca.");
+            return string.Join(" · ", partes);
+        }
+    }
+
+    /// <summary>La frase del aviso, con la fecha cuando se sabe.</summary>
+    public string WithdrawnDetail
+    {
+        get
+        {
+            var fecha = Origin.RetiredAtLabel;
+            return string.IsNullOrEmpty(fecha)
+                ? "Los estudiantes, el progreso y las calificaciones se conservaron. Si el contenido se reinstala, vuelve solo."
+                : $"Retirado {fecha}. Los estudiantes, el progreso y las calificaciones se conservaron. Si el contenido se reinstala, vuelve solo.";
+        }
+    }
+}
